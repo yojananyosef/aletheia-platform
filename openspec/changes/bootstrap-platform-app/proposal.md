@@ -27,6 +27,26 @@ existente se modifica ni se reutiliza como código: solo como conocimiento.
   aletheia-universal (repo en pausa).
 - **Distribución**: EAS Build/Submit (tiendas) + EAS Update (OTA) + export web.
 
+### Alcance completo por fases (F0–F14)
+
+El mapa de fases cubre TODO el inventario de funcionalidades de Logos extraído de
+app.logos.com (`docs/logos-feature-inventory.md`), mapeado a equivalentes gratuitos y
+abiertos, organizado para que nada quede afuera aunque el proyecto avance por fases:
+
+- F0-F5: base productiva (leer + escuchar + guardar + buscar básico + tiendas).
+- F6: workspace de paneles (tiles, tabs, link sets, entornos, command box) — la firma de Logos.
+- F7: notas y resaltados completos (cuadernos, anclajes, estilos).
+- F8: documentos personales (listas de pasajes/oración, recortes, copiar versículos,
+  bibliografía, export/import portable) + búsqueda avanzada (inline, colecciones, DSL).
+- F9: planes de lectura completos (generador, progreso, racha, catch-up).
+- F10: guías y workflows (requiere lote v1.1 del catálogo: TSK, Nave, Easton).
+- F11: Enciclopedia bíblica (factbook de entidades + pasajes paralelos + insights + timeline).
+- F12: idiomas originales (interlineal, word study, morfología — catálogo v1.1).
+- F13: búsqueda semántica local (embeddings sqlite-vec, resumen extractivo — reemplaza
+  todas las features "IA de Logos" sin cloud ni créditos).
+- F14: comparación de texto + presentador simple; roadmap documentado (mapas, sentidos,
+  sync self-hosted, multi-idioma).
+
 ## Non-Goals
 
 - No reutilizar código de aletheia-reader/bridge/modules/gateway (solo aprendizaje).
