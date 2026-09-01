@@ -1,0 +1,34 @@
+schema: spec-driven
+
+context: |
+  alethia-platform: plataforma de estudio bíblico gratuita y abierta (tipo Logos) en Expo.
+  Stack: Expo SDK 56 (React Native 0.85, React 19, New Architecture), Expo Router,
+  Bun workspaces (packages/core, packages/module-engine, apps/mobile),
+  NativeWind/Uniwind (Tailwind v4), reanimated, expo-sqlite (enableFTS),
+  EAS Build/Submit/Update.
+
+  Datos: módulos .amod (AMF v1) del catálogo oficial
+  https://github.com/yojananyosef/alethia-catalog (catalog/catalog.json: id, type,
+  license, sha256, downloadUrl). Lectura: descarga → sha256 → descomprimir →
+  content.db SQLite en sandbox con immutable=1. FTS5 unicode61 remove_diacritics 2.
+
+  UX: estructura Logos (Inicio/Biblioteca/Leer/Estudio/Buscar, bottom tabs móvil) con el
+  ADN de confort del legacy alethia-reader: temas pergamino/sepia/noche sin blanco puro
+  ni negro puro, fuentes OpenDyslexic/Atkinson Hyperlegible/Literata, targets 44px,
+  WCAG 2.2 AAA, lecturas biónica y silábica, line focus TDAH, resaltado bimodal TTS.
+
+  TTS: orquestador multi-motor — web (Web Speech + Piper WASM), móvil (expo-speech
+  nativo + UIBackgroundModes audio + lock screen controls vía expo-audio), offline
+  premium (react-native-sherpa-onnx con voces Piper es_ES).
+
+  Contenido: solo catálogo oficial vetado (docs/content-policy del catálogo);
+  licencia visible siempre. v1 sin catálogos de terceros ni import de usuario.
+
+  Convenciones: español en docs/UI, TypeScript strict, sin comentarios salvo necesidad,
+  commits convencionales, fases con verificación verde.
+
+rules:
+  tasks:
+    - Fases incrementales con verificación al cierre de cada una
+    - El catálogo (alethia-catalog) es la única fuente de contenido; nunca bundle de contenido copyright
+    - Tareas en chunks ≤ 2h

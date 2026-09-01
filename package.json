@@ -1,0 +1,14 @@
+{
+  "name": "alethia-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plataforma biblica universal gratuita y abierta (Logos-like) — Expo + modulos .amod",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "packageManager": "bun@1.4.0",
+  "scripts": {
+    "typecheck": "tsc -b"
+  }
+}

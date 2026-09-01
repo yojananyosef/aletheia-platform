@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+
+# expo / react native
+.expo/
+ios/
+android/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# builds
+dist/
+build/
+web-build/
+*.aab
+*.apk
+*.ipa
+
+# env
+.env
+.env.*
+!.env.example
+
+# misc
+.DS_Store
+*.tsbuildinfo
+.vercel
