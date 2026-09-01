@@ -9,6 +9,12 @@
   ],
   "packageManager": "bun@1.4.0",
   "scripts": {
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.3"
   }
 }

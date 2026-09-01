@@ -27,4 +27,5 @@ web-build/
 # misc
 .DS_Store
 *.tsbuildinfo
+types/
 .vercel

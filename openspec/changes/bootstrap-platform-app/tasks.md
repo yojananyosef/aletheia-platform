@@ -6,15 +6,15 @@ verificación verde antes de continuar.
 
 ## F0 — Monorepo + engine (sin UI)
 
-- [ ] Bun workspaces (apps/*, packages/*) + tsconfig project references + typecheck verde
-- [ ] `packages/core`: canon 66 libros (datos públicos), ReaderSettings, tokens de los 3 temas
-- [ ] `packages/core/tts`: interfaz Engine + TTSOrchestrator (cola por versículo, boundary,
+- [x] Bun workspaces (apps/*, packages/*) + tsconfig project references + typecheck verde
+- [x] `packages/core`: canon 66 libros (datos públicos), ReaderSettings, tokens de los 3 temas
+- [x] `packages/core/tts`: interfaz Engine + TTSOrchestrator (cola por versículo, boundary,
       cancelación con referencia local) + tests
-- [ ] `packages/module-engine`: catalog.ts (fetch + cache de catalog.json)
-- [ ] `packages/module-engine`: installer.ts (download → sha256 expo-crypto → unzip → sandbox)
-- [ ] `packages/module-engine`: registry.ts (instalados, versiones, enable/disable)
-- [ ] `packages/module-engine`: reader bible (verses/headings/footnotes) con expo-sqlite
-- [ ] Verificación: instalar ASV.amod en sandbox de test y leer Génesis 1:1 (test E2E del engine)
+- [x] `packages/module-engine`: catalog.ts (fetch + cache de catalog.json)
+- [x] `packages/module-engine`: installer.ts (download → sha256 expo-crypto → unzip → sandbox)
+- [x] `packages/module-engine`: registry.ts (instalados, versiones, enable/disable)
+- [x] `packages/module-engine`: reader bible (verses/headings/footnotes) con expo-sqlite
+- [x] Verificación: instalar ASV.amod en sandbox de test y leer Génesis 1:1 (test E2E del engine)
 
 ## F1 — Shell Expo + datos reales
 
