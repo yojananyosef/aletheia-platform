@@ -1,0 +1,70 @@
+@import 'tailwindcss';
+@import 'uniwind';
+
+@layer theme {
+  :root {
+    /* Fuentes accesibles registradas con expo-font (assets/fonts) */
+    --font-opendyslexic: 'OpenDyslexic';
+    --font-opendyslexic-bold: 'OpenDyslexicBold';
+    --font-atkinson: 'AtkinsonHyperlegible';
+    --font-atkinson-bold: 'AtkinsonHyperlegibleBold';
+    --font-literata: 'Literata';
+    --font-literata-bold: 'LiterataBold';
+
+    /* Pergamino (default) */
+    @variant light {
+      --color-reader-bg: #f5eede;
+      --color-reader-text: #33281a;
+      --color-reader-border: #d8c9a8;
+      --color-reader-muted: #7a6a4f;
+      --color-accent: #8a5a2b;
+      --color-accent-fg: #f5eede;
+      --color-hover: #ece2cc;
+      --color-accent-subtle: #e5d5b5;
+    }
+
+    @variant dark {
+      --color-reader-bg: #1c1a17;
+      --color-reader-text: #d9d2c5;
+      --color-reader-border: #3a352d;
+      --color-reader-muted: #918977;
+      --color-accent: #c99b5f;
+      --color-accent-fg: #1c1a17;
+      --color-hover: #282520;
+      --color-accent-subtle: #33302a;
+    }
+
+    @variant pergamino {
+      --color-reader-bg: #f5eede;
+      --color-reader-text: #33281a;
+      --color-reader-border: #d8c9a8;
+      --color-reader-muted: #7a6a4f;
+      --color-accent: #8a5a2b;
+      --color-accent-fg: #f5eede;
+      --color-hover: #ece2cc;
+      --color-accent-subtle: #e5d5b5;
+    }
+
+    @variant sepia {
+      --color-reader-bg: #e8dcc3;
+      --color-reader-text: #413421;
+      --color-reader-border: #c9b68d;
+      --color-reader-muted: #6e5c40;
+      --color-accent: #7c4f24;
+      --color-accent-fg: #e8dcc3;
+      --color-hover: #ddceac;
+      --color-accent-subtle: #d6c197;
+    }
+
+    @variant noche {
+      --color-reader-bg: #1c1a17;
+      --color-reader-text: #d9d2c5;
+      --color-reader-border: #3a352d;
+      --color-reader-muted: #918977;
+      --color-accent: #c99b5f;
+      --color-accent-fg: #1c1a17;
+      --color-hover: #282520;
+      --color-accent-subtle: #33302a;
+    }
+  }
+}

@@ -9,7 +9,7 @@
   ],
   "packageManager": "bun@1.4.0",
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "tsc -b && tsc --noEmit -p apps/mobile",
     "test": "bun test"
   },
   "devDependencies": {

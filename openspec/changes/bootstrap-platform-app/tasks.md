@@ -18,12 +18,16 @@ verificación verde antes de continuar.
 
 ## F1 — Shell Expo + datos reales
 
-- [ ] `apps/mobile`: Expo SDK 56 + Expo Router + NativeWind/Uniwind + tipos estrictos
-- [ ] Tokens de tema (pergamino/sepia/noche) + expo-font (OpenDyslexic/Atkinson/Literata)
-- [ ] Pantalla Biblioteca: catálogo con fichas (licencia/attribution visibles) + instalar
-- [ ] Pantalla Leer mínima: capítulo desde módulo instalado, navegación capítulos
+- [x] `apps/mobile`: Expo SDK 56 + Expo Router + NativeWind/Uniwind + tipos estrictos
+- [x] Tokens de tema (pergamino/sepia/noche) + expo-font (OpenDyslexic/Atkinson/Literata)
+- [x] Pantalla Biblioteca: catálogo con fichas (licencia/attribution visibles) + instalar
+- [x] Pantalla Leer mínima: capítulo desde módulo instalado, navegación capítulos
 - [ ] Config plugin expo-sqlite `enableFTS` + verificación FTS5 en dispositivo
+      (plugin configurado en app.json; `verifyFts5Support()` corre al abrir Biblioteca
+      con chip "FTS5 verificado" — pendiente confirmar en dispositivo real)
 - [ ] Verificación: instalar ASV desde el catálogo real en simulador y leer Génesis 1 completo
+      (engine cubierto por E2E F0 verde: catálogo real → ASV → Génesis 1; pendiente flujo
+      completo en simulador — `bunx expo start` no disponible en este entorno)
 
 ## F2 — Lector paridad (§B inventario)
 
