@@ -17,8 +17,8 @@ y updates OTA vía EAS Update.
 ### Requirement: Paralelismo con el ecosistema existente
 
 El proyecto SHALL operar en paralelo sin modificar el ecosistema existente
-(alethia-reader en Vercel, alethia-bridge, alethia-modules, alethia-gateway); el único
-acoplamiento permitido es el consumo del catálogo publicado por alethia-catalog.
+(aletheia-reader en Vercel, aletheia-bridge, aletheia-modules, aletheia-gateway); el único
+acoplamiento permitido es el consumo del catálogo publicado por aletheia-catalog.
 
 #### Scenario: Ecosistema intacto
 - **WHEN** cualquier fase avanza

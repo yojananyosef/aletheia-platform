@@ -3,7 +3,7 @@
 ## 1. Monorepo y frontera de paquetes
 
 ```
-alethia-platform/
+aletheia-platform/
 ├── packages/core/           # TS puro, cero dependencias de React/RN
 │   ├── canon/               # tabla 66 libros + rangos (reimplementada desde hechos públicos)
 │   ├── settings/            # ReaderSettings, temas, fuentes, flags neurocognitivos
@@ -31,7 +31,7 @@ catalog.json (GitHub) → Biblioteca UI (fichas con license/attribution visibles
 - Actualización de módulo: re-instalar sobre versión mayor; el engine conserva notas del
   usuario (almacenadas aparte, keyed por (moduleId, book, chapter, verse)).
 
-## 3. UI — estructura Logos, confort Alethia
+## 3. UI — estructura Logos, confort Aletheia
 
 - **Navegación móvil**: bottom tabs (Inicio · Biblioteca · Leer · Estudio · Buscar);
   en web export: sidebar adaptativo.
@@ -45,7 +45,7 @@ catalog.json (GitHub) → Biblioteca UI (fichas con license/attribution visibles
   lector), lookup de diccionario por long-press de palabra → búsqueda FTS5.
 - **Buscar**: FTS5 global por módulo con `unicode61 remove_diacritics 2` ("Jesús" ≈ "jesus").
 
-## 4. TTS (diseño absorbido de alethia-universal)
+## 4. TTS (diseño absorbido de aletheia-universal)
 
 - `TTSOrchestrator` en core: cola por versículo, boundary events para resaltado bimodal,
   cancelación con referencia local (lección del fix de pausa del legacy).

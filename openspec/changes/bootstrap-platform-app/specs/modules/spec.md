@@ -2,7 +2,7 @@
 
 ### Requirement: Consumo del catálogo oficial .amod
 
-El sistema SHALL consumir `catalog.json` del catálogo oficial (alethia-catalog) como única
+El sistema SHALL consumir `catalog.json` del catálogo oficial (aletheia-catalog) como única
 fuente de contenido, mostrando por cada módulo su licencia, copyright y atribución antes
 de la instalación, y descargando desde el `downloadUrl` declarado.
 
