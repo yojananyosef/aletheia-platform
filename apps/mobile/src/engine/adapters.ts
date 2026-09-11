@@ -87,7 +87,18 @@ class ExpoSqliteAdapter implements SqlitePort {
         (await db.getFirstAsync<T>(sql, params as SQLiteBindParams)) ?? undefined,
       all: async <T>(sql: string, params?: ReadonlyArray<string | number | null>) =>
         await db.getAllAsync<T>(sql, params as SQLiteBindParams),
-      close: () => db.closeAsync(),
+      exec: async (sql: string, params?: ReadonlyArray<string | number | null>) => {
+        if (params === undefined || params.length === 0) {
+          await db.execAsync(sql)
+        } else {
+          await db.runAsync(sql, params as SQLiteBindParams)
+        }
+      },
+      // Intencionadamente no-op: expo-sqlite ~56 aborta el proceso (SIGABRT
+      // en sqlite3_close -> exsqlite3_finalize) al cerrar bases en Android
+      // (tombstone verificado en emulador). Los lectores se abren una vez
+      // por modulo y sesion; se liberan al morir el proceso.
+      close: () => Promise.resolve(),
     }
   }
 }

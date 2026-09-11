@@ -19,6 +19,8 @@ export interface CryptoPort {
 export interface SqliteDb {
   get<T = unknown>(sql: string, params?: ReadonlyArray<string | number | null>): Promise<T | undefined>
   all<T = unknown>(sql: string, params?: ReadonlyArray<string | number | null>): Promise<T[]>
+  /** Sentencias sin filas (DDL/DML). Usado por el probe FTS5 sobre bases :memory:. */
+  exec(sql: string, params?: ReadonlyArray<string | number | null>): Promise<void>
   close(): Promise<void>
 }
 

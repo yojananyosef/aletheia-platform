@@ -22,24 +22,65 @@ verificación verde antes de continuar.
 - [x] Tokens de tema (pergamino/sepia/noche) + expo-font (OpenDyslexic/Atkinson/Literata)
 - [x] Pantalla Biblioteca: catálogo con fichas (licencia/attribution visibles) + instalar
 - [x] Pantalla Leer mínima: capítulo desde módulo instalado, navegación capítulos
-- [ ] Config plugin expo-sqlite `enableFTS` + verificación FTS5 en dispositivo
+- [x] Config plugin expo-sqlite `enableFTS` + verificación FTS5 en dispositivo
       (plugin configurado en app.json; `verifyFts5Support()` corre al abrir Biblioteca
-      con chip "FTS5 verificado" — pendiente confirmar en dispositivo real)
-- [ ] Verificación: instalar ASV desde el catálogo real en simulador y leer Génesis 1 completo
-      (engine cubierto por E2E F0 verde: catálogo real → ASV → Génesis 1; pendiente flujo
-      completo en simulador — `bunx expo start` no disponible en este entorno)
+      con chip "FTS5 verificado" — el SQL del probe vive en
+      `module-engine/src/reader/fts-probe.ts` compartido y verificado headless con
+      bun:sqlite (`test/fts-probe.test.ts` verde: Jesús≈JESUS + casos de fallo).
+      VERIFICADO en emulador 2026-09-11: chip "FTS5 verificado ✓" con catálogo
+      real. Hallazgo: expo-sqlite ~56 aborta (SIGABRT en sqlite3_close) al cerrar
+      la base :memory: — el probe ya no cierra (una :memory: por sesión) y el
+      resultado se cachea con un reintento anti-HMR. Nota: en Expo Go el sqlite
+      empaquetado ya trae FTS5; re-verificar el chip en una dev build EAS antes
+      de release.)
+- [x] Verificación: instalar ASV desde el catálogo real en simulador y leer Génesis 1 completo
+      (VERIFICADO en emulador Aletheia_Light 2026-09-11 con capturas: catálogo v1
+      con 4 módulos → Instalar ASV 3.2MB → "Instalado v1.0.0" → Leer muestra
+      Génesis 1 y 2 íntegros; la instalación persiste tras force-stop. Hallazgo:
+      el `unzip` asíncrono de fflate usa Web Workers (inexistentes en Hermes) —
+      el installer usa `unzipSync` desde entonces.)
 
 ## F2 — Lector paridad (§B inventario)
 
 - [ ] Paginación por presupuesto de alto con onLayout (fixture comparativo ±2%)
-- [ ] verse-super, headings, notas al pie + Tooltip long-press temado (gemelo RN)
-- [ ] TOC (tabla de contenidos) + locator bar + navegación por libro/capítulo
-- [ ] Temas/fuentes/tamaños/interlineado/espaciado conectados a settings
-- [ ] Bionic reading + puntos silábicos + line focus TDAH (core compartido)
-- [ ] Modo lectura simple (a11y AAA, "vista limitada" heredada de Logos)
+      (pendiente: el lector actual usa ScrollView continuo; la paginación discreta
+      con continuaciones sin repetir verse-super requiere medición en dispositivo)
+- [x] verse-super, headings, notas al pie + Tooltip long-press temado (gemelo RN)
+      (números superíndice + headings del engine; notas con tooltip custom en Modal,
+      abre con tap y long-press, sin tooltips nativos; long-press de nota no
+      dispara el VerseModal del versículo — VERIFICADO en emulador 2026-09-11:
+      verse-super visible en Génesis 1-2; el ASV trae hasHeadings:false así que
+      headings/tooltip de nota quedan verificados a nivel de engine + tests,
+      pendientes de un módulo con esos features en dispositivo)
+- [x] TOC (tabla de contenidos) + locator bar + navegación por libro/capítulo
+      (picker con pestañas Libros/Capítulos, grid de capítulos, locator
+      "Libro cap/total" tocable — VERIFICADO en emulador 2026-09-11: lista de
+      libros con conteos, grid 5 columnas, salto a Génesis 2. Hallazgo: cambiar
+      `numColumns` de un FlatList en caliente crashea (Invariant Violation) —
+      cada pestaña usa su propio FlatList con `key` distinto.)
+- [x] Temas/fuentes/tamaños/interlineado/espaciado conectados a settings
+      (hoja "Aa": 3 temas, 4 fuentes, steppers con clamp del core, todo ≥44px —
+      VERIFICADO en emulador 2026-09-11: cambio a tema Noche re-renderiza toda
+      la app en oscuro)
+- [x] Bionic reading + puntos silábicos + line focus TDAH (core compartido)
+      (`packages/core/src/reading/text.ts` + 40 tests: silabeo ES determinista
+      con diptongos/hiatus/h-muda/dígrafos, biónica por segmentos; line focus
+      atenúa versículos no enfocados, el foco sigue al toque — VERIFICADO en
+      emulador 2026-09-11: Génesis 2 con anclas en negrita tras activar el toggle)
+- [x] Modo lectura simple (a11y AAA, "vista limitada" heredada de Logos)
+      (mínimos 18pt/1.6, sin biónica/silábica ni marcadores de nota)
 - [ ] Filtros del lector: notas on/off, números on/off, columnas 1/2/auto
-- [ ] Marcadores + VerseModal (bottom sheet) + posición persistente
+      (notas y números conmutables desde la hoja "Aa" — toggles visibles y con
+      estado en emulador; columnas 1/2/auto pendiente del layout de paginación
+      — exponer el control hoy sería falso)
+- [x] Marcadores + VerseModal (bottom sheet) + posición persistente
+      (`reading-position.json` por módulo/libro/cap con reanudación al abrir —
+      VERIFICADO en emulador 2026-09-11: tras navegar a Génesis 2, un
+      force-stop + relanzar restaura "Genesis 2" directamente;
+      `bookmarks.json` con toggle desde VerseModal por long-press + indicador ◆;
+      5 tests del store)
 - [ ] Verificación: 3 capítulos comparados contra legacy; audit de accesibilidad básica
+      (pendiente dispositivo + acceso al legacy)
 
 ## F3 — TTS bimodal + background
 

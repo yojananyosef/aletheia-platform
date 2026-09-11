@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   ActivityIndicator,
   FlatList,
@@ -9,10 +9,31 @@ import {
   View,
 } from 'react-native'
 
-import { THEME_TOKENS } from '@aletheia/core'
-import type { BibleBook, BibleReader, ChapterContent, Heading } from '@aletheia/module-engine'
+import {
+  THEME_TOKENS,
+  toBionicSegments,
+  toSyllabicText,
+  type FontFamilyId,
+  type ThemeName,
+} from '@aletheia/core'
+import type {
+  BibleBook,
+  BibleReader,
+  ChapterContent,
+  Footnote,
+  Heading,
+  VerseText,
+} from '@aletheia/module-engine'
 
 import { useEngine } from '@/engine/provider'
+import {
+  bookmarkKey,
+  loadBookmarks,
+  loadReadingPosition,
+  saveBookmarks,
+  saveReadingPosition,
+  type Bookmark,
+} from '@/engine/reading-store'
 import { useSettings } from '@/engine/settings'
 import { FONT_FAMILY_NAMES } from '@/theme/typography'
 
@@ -40,29 +61,59 @@ function buildChapterItems(content: ChapterContent): ChapterItem[] {
   return items
 }
 
+function verseLabel(verse: VerseText): string {
+  return verse.verseEnd !== undefined ? `${String(verse.verse)}–${String(verse.verseEnd)}` : String(verse.verse)
+}
+
+function verseRef(bookName: string, chapter: number, verse: VerseText): string {
+  return `${bookName} ${String(chapter)}:${verseLabel(verse)}`
+}
+
+const THEME_OPTIONS: Array<{ id: ThemeName; label: string }> = [
+  { id: 'pergamino', label: 'Pergamino' },
+  { id: 'sepia', label: 'Sepia' },
+  { id: 'noche', label: 'Noche' },
+]
+
+const FONT_OPTIONS: Array<{ id: FontFamilyId; label: string }> = [
+  { id: 'system', label: 'Sistema' },
+  { id: 'literata', label: 'Literata' },
+  { id: 'atkinson', label: 'Atkinson' },
+  { id: 'opendyslexic', label: 'OpenDyslexic' },
+]
+
 export default function LeerScreen() {
   const engine = useEngine()
-  const { settings } = useSettings()
+  const { settings, update } = useSettings()
+  const [moduleId, setModuleId] = useState<string | null>(null)
   const [moduleName, setModuleName] = useState<string | null>(null)
   const [books, setBooks] = useState<BibleBook[]>([])
   const [book, setBook] = useState<BibleBook | null>(null)
   const [chapter, setChapter] = useState(1)
   const [content, setContent] = useState<ChapterContent | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerTab, setPickerTab] = useState<'books' | 'chapters'>('books')
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [modalVerse, setModalVerse] = useState<VerseText | null>(null)
+  const [openFootnote, setOpenFootnote] = useState<Footnote | null>(null)
+  const [focusedVerse, setFocusedVerse] = useState<number | null>(null)
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const handleRef = useRef<OpenedBible | null>(null)
   const moduleIdRef = useRef<string | null>(null)
+  // El long-press sobre una nota abre su tooltip; evita que el long-press
+  // del versiculo (VerseModal) dispare a la vez.
+  const suppressVerseModalUntil = useRef(0)
 
   const openFirstBible = useCallback(async () => {
-    const installed = (await engine.registry.list()).filter(
-      (m) => m.type === 'bible' && m.enabled,
-    )
-    const first = installed[0]
+    const installed = await engine.registry.list()
+    const first = installed.filter((m) => m.type === 'bible' && m.enabled)[0]
     if (!first) {
       handleRef.current = null
       moduleIdRef.current = null
+      setModuleId(null)
       setModuleName(null)
       setBooks([])
       setBook(null)
@@ -76,9 +127,22 @@ export default function LeerScreen() {
     handleRef.current = opened
     moduleIdRef.current = first.id
     const list = await opened.reader.listBooks()
+    setModuleId(first.id)
     setModuleName(first.name)
     setBooks(list)
-    setBook((prev) => list.find((b) => b.osisCode === prev?.osisCode) ?? list[0] ?? null)
+    // Reanudar lectura: restaura (libro, capitulo) guardados de este modulo.
+    const saved = await loadReadingPosition(engine.ports.fs, engine.sandboxDir)
+    const restored =
+      saved !== null && saved.moduleId === first.id
+        ? list.find((b) => b.osisCode === saved.osisCode) ?? null
+        : null
+    if (restored !== null && saved !== null && saved.chapter <= restored.chapterCount) {
+      setBook(restored)
+      setChapter(saved.chapter)
+      setFocusedVerse(null)
+    } else {
+      setBook((prev) => list.find((b) => b.osisCode === prev?.osisCode) ?? list[0] ?? null)
+    }
   }, [engine])
 
   useEffect(() => {
@@ -96,6 +160,18 @@ export default function LeerScreen() {
   }, [openFirstBible])
 
   useEffect(() => {
+    let active = true
+    void loadBookmarks(engine.ports.fs, engine.sandboxDir)
+      .then((b) => {
+        if (active) setBookmarks(b)
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [engine])
+
+  useEffect(() => {
     return () => {
       void handleRef.current?.close()
       handleRef.current = null
@@ -111,7 +187,9 @@ export default function LeerScreen() {
     void opened.reader
       .getChapter(book.osisCode, chapter)
       .then((c) => {
-        if (active) setContent(c)
+        if (!active) return
+        setContent(c)
+        setFocusedVerse(c.verses[0]?.verse ?? null)
       })
       .catch((e) => {
         if (active) {
@@ -127,9 +205,78 @@ export default function LeerScreen() {
     }
   }, [book, chapter, moduleName])
 
+  // Posicion persistente (best-effort, nunca bloquea la lectura).
+  useEffect(() => {
+    if (moduleId === null || book === null) return
+    void saveReadingPosition(engine.ports.fs, engine.sandboxDir, {
+      moduleId,
+      osisCode: book.osisCode,
+      chapter,
+    })
+  }, [engine, moduleId, book, chapter])
+
+  const bookmarkSet = useMemo(
+    () => new Set(bookmarks.map((b) => bookmarkKey(b))),
+    [bookmarks],
+  )
+
+  const toggleBookmark = useCallback(
+    (verse: VerseText) => {
+      if (moduleId === null || book === null) return
+      setBookmarks((prev) => {
+        const key = bookmarkKey({ moduleId, osisCode: book.osisCode, chapter, verse: verse.verse })
+        const next = prev.some((b) => bookmarkKey(b) === key)
+          ? prev.filter((b) => bookmarkKey(b) !== key)
+          : [
+              ...prev,
+              {
+                moduleId,
+                osisCode: book.osisCode,
+                chapter,
+                verse: verse.verse,
+                verseEnd: verse.verseEnd,
+                createdAt: Date.now(),
+              },
+            ]
+        void saveBookmarks(engine.ports.fs, engine.sandboxDir, next)
+        return next
+      })
+    },
+    [engine, moduleId, book, chapter],
+  )
+
   const fontFamily = FONT_FAMILY_NAMES[settings.fontFamily]
+  // Lectura simple: minimos de legibilidad AAA, sin adornos.
+  const simpleMode = settings.simpleReadingMode
+  const fontSize = simpleMode ? Math.max(settings.fontSize, 18) : settings.fontSize
+  const lineHeight = simpleMode ? Math.max(settings.lineHeight, 1.6) : settings.lineHeight
+  const useBionic = settings.bionicReading && !simpleMode
+  const useSyllabic = settings.syllablePoints && !simpleMode
+  const showFootnotes = settings.footnotes && !simpleMode
   const items = content !== null ? buildChapterItems(content) : []
-  const verseNumbersColor = THEME_TOKENS[settings.theme].readerMuted
+  const footnotesByVerse = useMemo(() => {
+    const map = new Map<number, Footnote[]>()
+    for (const f of content?.footnotes ?? []) {
+      const list = map.get(f.verse) ?? []
+      list.push(f)
+      map.set(f.verse, list)
+    }
+    return map
+  }, [content])
+
+  const renderVerseText = (text: string, baseSize: number, mutedColor: string): ReactNode => {
+    if (useBionic) {
+      return toBionicSegments(text).map((s, k) => (
+        <Text key={k} style={s.strong ? { fontWeight: '700' } : undefined}>
+          {s.text}
+        </Text>
+      ))
+    }
+    if (useSyllabic) {
+      return toSyllabicText(text)
+    }
+    return text
+  }
 
   const changeChapter = (delta: number) => {
     if (content === null) return
@@ -150,19 +297,41 @@ export default function LeerScreen() {
     )
   }
 
+  const baseTextStyle = {
+    fontFamily,
+    fontSize,
+    lineHeight: fontSize * lineHeight,
+    letterSpacing: settings.letterSpacing,
+  }
+  const verseNumbersColor = THEME_TOKENS[settings.theme].readerMuted
+  const chapterNumbers = book !== null ? Array.from({ length: book.chapterCount }, (_, k) => k + 1) : []
+
   return (
     <View className="flex-1 bg-reader-bg">
       <View className="gap-2 border-b border-reader-border px-4 pb-2 pt-1">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Elegir libro"
-          onPress={() => setPickerOpen(true)}
-          className="min-h-[44px] flex-row items-center justify-center rounded-xl bg-hover px-4"
-        >
-          <Text className="text-base font-semibold text-reader-text">
-            {book !== null ? `${book.name} ${String(chapter)}` : 'Elegir libro'}
-          </Text>
-        </Pressable>
+        <View className="flex-row items-center gap-2">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Elegir libro"
+            onPress={() => {
+              setPickerTab('books')
+              setPickerOpen(true)
+            }}
+            className="min-h-[44px] flex-1 flex-row items-center justify-center rounded-xl bg-hover px-4"
+          >
+            <Text className="text-base font-semibold text-reader-text">
+              {book !== null ? `${book.name} ${String(chapter)}` : 'Elegir libro'}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Ajustes de lectura"
+            onPress={() => setSettingsOpen(true)}
+            className="min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-hover px-3 active:opacity-70"
+          >
+            <Text className="text-base font-bold text-reader-text">Aa</Text>
+          </Pressable>
+        </View>
         <View className="flex-row items-center justify-center gap-3">
           <Pressable
             accessibilityRole="button"
@@ -173,11 +342,19 @@ export default function LeerScreen() {
           >
             <Text className="text-xl text-reader-text">‹</Text>
           </Pressable>
-          <Text className="text-sm text-reader-muted">
-            {book !== null
-              ? `${book.name} ${String(chapter)} / ${String(book.chapterCount)}`
-              : ''}
-          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Elegir capítulo"
+            onPress={() => {
+              setPickerTab('chapters')
+              setPickerOpen(true)
+            }}
+            className="min-h-[44px] items-center justify-center rounded-xl px-3 active:bg-hover"
+          >
+            <Text className="text-sm text-reader-muted">
+              {book !== null ? `${book.name} ${String(chapter)} / ${String(book.chapterCount)}` : ''}
+            </Text>
+          </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Capítulo siguiente"
@@ -205,15 +382,7 @@ export default function LeerScreen() {
         </View>
       ) : (
         <ScrollView contentContainerClassName="px-5 pb-10 pt-3">
-          <Text
-            style={{
-              fontFamily,
-              fontSize: settings.fontSize,
-              lineHeight: settings.fontSize * settings.lineHeight,
-              letterSpacing: settings.letterSpacing,
-            }}
-            className="text-reader-text"
-          >
+          <Text style={baseTextStyle} className="text-reader-text">
             {items.map((item, i) =>
               item.kind === 'heading' ? (
                 <Text key={`h-${String(i)}`}>
@@ -222,62 +391,533 @@ export default function LeerScreen() {
                   {'\n'}
                 </Text>
               ) : (
-                <Text key={`v-${String(i)}`}>
-                  {settings.verseNumbers ? (
-                    <Text style={{ fontSize: settings.fontSize * 0.65, color: verseNumbersColor }}>
-                      {' '}
-                      {String(content.verses[item.verseIndex]?.verse ?? '')}{' '}
-                    </Text>
-                  ) : null}
-                  {(content.verses[item.verseIndex]?.text ?? '') + ' '}
-                </Text>
+                <VerseRow
+                  key={`v-${String(i)}`}
+                  verse={content.verses[item.verseIndex]}
+                  bookName={content.book.name}
+                  chapter={chapter}
+                  baseStyle={baseTextStyle}
+                  verseNumberColor={verseNumbersColor}
+                  showVerseNumbers={settings.verseNumbers}
+                  footnotes={footnotesByVerse.get(content.verses[item.verseIndex]?.verse ?? -1) ?? []}
+                  showFootnotes={showFootnotes}
+                  bookmarked={
+                    moduleId !== null &&
+                    book !== null &&
+                    bookmarkSet.has(
+                      bookmarkKey({
+                        moduleId,
+                        osisCode: book.osisCode,
+                        chapter,
+                        verse: content.verses[item.verseIndex]?.verse ?? -1,
+                      }),
+                    )
+                  }
+                  dimmed={
+                    settings.lineFocus &&
+                    focusedVerse !== null &&
+                    content.verses[item.verseIndex]?.verse !== focusedVerse
+                  }
+                  onFocus={() => setFocusedVerse(content.verses[item.verseIndex]?.verse ?? null)}
+                  onOpenModal={() => {
+                    if (Date.now() < suppressVerseModalUntil.current) return
+                    const v = content.verses[item.verseIndex]
+                    if (v) {
+                      setFocusedVerse(v.verse)
+                      setModalVerse(v)
+                    }
+                  }}
+                  onOpenFootnote={setOpenFootnote}
+                  onFootnotePressStart={() => {
+                    suppressVerseModalUntil.current = Date.now() + 600
+                  }}
+                  renderText={renderVerseText}
+                />
               ),
             )}
           </Text>
         </ScrollView>
       )}
 
-      <Modal
+      <PickerModal
         visible={pickerOpen}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setPickerOpen(false)}
-      >
-        <View className="flex-1 justify-end bg-black/40">
-          <View className="max-h-[70%] rounded-t-2xl border-t border-reader-border bg-reader-bg pt-4">
-            <View className="flex-row items-center justify-between px-5 pb-2">
-              <Text className="text-lg font-bold text-reader-text">{moduleName}</Text>
-              <Pressable
+        tab={pickerTab}
+        onTabChange={setPickerTab}
+        moduleName={moduleName}
+        books={books}
+        activeOsis={book?.osisCode ?? null}
+        chapters={chapterNumbers}
+        activeChapter={chapter}
+        onPickBook={(b) => {
+          setBook(b)
+          setChapter(1)
+          setPickerOpen(false)
+        }}
+        onPickChapter={(c) => {
+          setChapter(c)
+          setPickerOpen(false)
+        }}
+        onClose={() => setPickerOpen(false)}
+      />
+
+      <ReadingSettingsSheet
+        visible={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
+
+      <VerseModal
+        verse={modalVerse}
+        bookName={book?.name ?? ''}
+        chapter={chapter}
+        bookmarked={
+          modalVerse !== null &&
+          moduleId !== null &&
+          book !== null &&
+          bookmarkSet.has(
+            bookmarkKey({ moduleId, osisCode: book.osisCode, chapter, verse: modalVerse.verse }),
+          )
+        }
+        onToggleBookmark={() => {
+          if (modalVerse) toggleBookmark(modalVerse)
+        }}
+        onClose={() => setModalVerse(null)}
+      />
+
+      <FootnoteTooltip footnote={openFootnote} onClose={() => setOpenFootnote(null)} />
+    </View>
+  )
+}
+
+interface VerseRowProps {
+  verse: VerseText | undefined
+  bookName: string
+  chapter: number
+  baseStyle: { fontFamily: string | undefined; fontSize: number; lineHeight: number; letterSpacing: number }
+  verseNumberColor: string
+  showVerseNumbers: boolean
+  footnotes: Footnote[]
+  showFootnotes: boolean
+  bookmarked: boolean
+  dimmed: boolean
+  onFocus(): void
+  onOpenModal(): void
+  onOpenFootnote(f: Footnote): void
+  onFootnotePressStart(): void
+  renderText(text: string, baseSize: number, mutedColor: string): ReactNode
+}
+
+function VerseRow({
+  verse,
+  bookName,
+  chapter,
+  baseStyle,
+  verseNumberColor,
+  showVerseNumbers,
+  footnotes,
+  showFootnotes,
+  bookmarked,
+  dimmed,
+  onFocus,
+  onOpenModal,
+  onOpenFootnote,
+  onFootnotePressStart,
+  renderText,
+}: VerseRowProps) {
+  if (!verse) return null
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={verseRef(bookName, chapter, verse)}
+      accessibilityHint="Toca para enfocar, mantén para opciones del versículo"
+      onPress={onFocus}
+      onLongPress={onOpenModal}
+      delayLongPress={350}
+      style={dimmed ? { opacity: 0.35 } : undefined}
+    >
+      <Text style={baseStyle} className="text-reader-text">
+        {bookmarked ? <Text style={{ color: verseNumberColor }}>{'◆ '}</Text> : null}
+        {showVerseNumbers ? (
+          <Text style={{ fontSize: baseStyle.fontSize * 0.65, color: verseNumberColor }}>
+            {' '}
+            {verseLabel(verse)}{' '}
+          </Text>
+        ) : null}
+        {renderText(verse.text, baseStyle.fontSize, verseNumberColor)}
+        {showFootnotes
+          ? footnotes.map((f, k) => (
+              <Text
+                key={k}
+                style={{ fontSize: baseStyle.fontSize * 0.65, color: verseNumberColor }}
+                onPress={() => onOpenFootnote(f)}
+                onLongPress={() => {
+                  onFootnotePressStart()
+                  onOpenFootnote(f)
+                }}
                 accessibilityRole="button"
-                accessibilityLabel="Cerrar selector de libros"
-                onPress={() => setPickerOpen(false)}
-                className="min-h-[44px] min-w-[44px] items-center justify-center rounded-xl active:bg-hover"
+                accessibilityLabel={`Nota al pie ${f.caller}`}
+                accessibilityHint="Toca o mantén para leer la nota"
               >
-                <Text className="text-xl text-reader-text">✕</Text>
-              </Pressable>
-            </View>
+                {' ['}
+                {f.caller}
+                {']'}
+              </Text>
+            ))
+          : null}
+        {' '}
+      </Text>
+    </Pressable>
+  )
+}
+
+interface PickerModalProps {
+  visible: boolean
+  tab: 'books' | 'chapters'
+  onTabChange(tab: 'books' | 'chapters'): void
+  moduleName: string
+  books: BibleBook[]
+  activeOsis: string | null
+  chapters: number[]
+  activeChapter: number
+  onPickBook(b: BibleBook): void
+  onPickChapter(c: number): void
+  onClose(): void
+}
+
+function PickerModal({
+  visible,
+  tab,
+  onTabChange,
+  moduleName,
+  books,
+  activeOsis,
+  chapters,
+  activeChapter,
+  onPickBook,
+  onPickChapter,
+  onClose,
+}: PickerModalProps) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View className="flex-1 justify-end bg-black/40">
+        <View className="max-h-[70%] rounded-t-2xl border-t border-reader-border bg-reader-bg pt-4">
+          <View className="flex-row items-center justify-between px-5 pb-2">
+            <Text className="text-lg font-bold text-reader-text">{moduleName}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Cerrar selector"
+              onPress={onClose}
+              className="min-h-[44px] min-w-[44px] items-center justify-center rounded-xl active:bg-hover"
+            >
+              <Text className="text-xl text-reader-text">✕</Text>
+            </Pressable>
+          </View>
+          <View className="flex-row gap-2 px-5 pb-2">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ver libros"
+              onPress={() => onTabChange('books')}
+              className={`min-h-[44px] flex-1 items-center justify-center rounded-xl px-4 ${tab === 'books' ? 'bg-accent' : 'bg-hover'}`}
+            >
+              <Text className={`text-sm font-semibold ${tab === 'books' ? 'text-accent-fg' : 'text-reader-text'}`}>
+                Libros
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ver capítulos"
+              onPress={() => onTabChange('chapters')}
+              className={`min-h-[44px] flex-1 items-center justify-center rounded-xl px-4 ${tab === 'chapters' ? 'bg-accent' : 'bg-hover'}`}
+            >
+              <Text className={`text-sm font-semibold ${tab === 'chapters' ? 'text-accent-fg' : 'text-reader-text'}`}>
+                Capítulos
+              </Text>
+            </Pressable>
+          </View>
+          {tab === 'books' ? (
             <FlatList
+              key="books-1col"
               data={books}
               keyExtractor={(b) => String(b.bookId)}
               renderItem={({ item }) => (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Abrir ${item.name}`}
-                  onPress={() => {
-                    setBook(item)
-                    setChapter(1)
-                    setPickerOpen(false)
-                  }}
-                  className={`min-h-[44px] flex-row items-center justify-between px-5 py-2 active:bg-hover ${book?.osisCode === item.osisCode ? 'bg-hover' : ''}`}
+                  onPress={() => onPickBook(item)}
+                  className={`min-h-[44px] flex-row items-center justify-between px-5 py-2 active:bg-hover ${activeOsis === item.osisCode ? 'bg-hover' : ''}`}
                 >
                   <Text className="text-base text-reader-text">{item.name}</Text>
                   <Text className="text-xs text-reader-muted">{String(item.chapterCount)} cap.</Text>
                 </Pressable>
               )}
             />
+          ) : (
+            <FlatList
+              key="chapters-5col"
+              data={chapters}
+              keyExtractor={(c) => String(c)}
+              numColumns={5}
+              contentContainerClassName="px-4 pb-6 pt-1"
+              renderItem={({ item }) => (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ir al capítulo ${String(item)}`}
+                  onPress={() => onPickChapter(item)}
+                  className={`m-1 min-h-[44px] flex-1 items-center justify-center rounded-xl ${item === activeChapter ? 'bg-accent' : 'bg-hover'}`}
+                >
+                  <Text className={`text-base ${item === activeChapter ? 'font-bold text-accent-fg' : 'text-reader-text'}`}>
+                    {String(item)}
+                  </Text>
+                </Pressable>
+              )}
+            />
+          )}
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+function ReadingSettingsSheet({ visible, onClose }: { visible: boolean; onClose(): void }) {
+  const { settings, update } = useSettings()
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View className="flex-1 justify-end bg-black/40">
+        <View className="max-h-[80%] rounded-t-2xl border-t border-reader-border bg-reader-bg pt-4">
+          <View className="flex-row items-center justify-between px-5 pb-2">
+            <Text className="text-lg font-bold text-reader-text">Ajustes de lectura</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Cerrar ajustes de lectura"
+              onPress={onClose}
+              className="min-h-[44px] min-w-[44px] items-center justify-center rounded-xl active:bg-hover"
+            >
+              <Text className="text-xl text-reader-text">✕</Text>
+            </Pressable>
+          </View>
+          <ScrollView contentContainerClassName="gap-4 px-5 pb-8">
+            <SettingsGroup label="Tema">
+              <View className="flex-row gap-2">
+                {THEME_OPTIONS.map((t) => (
+                  <Pressable
+                    key={t.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Tema ${t.label}`}
+                    onPress={() => update({ theme: t.id })}
+                    className={`min-h-[44px] flex-1 items-center justify-center rounded-xl px-2 ${settings.theme === t.id ? 'bg-accent' : 'bg-hover'}`}
+                  >
+                    <Text className={`text-sm font-semibold ${settings.theme === t.id ? 'text-accent-fg' : 'text-reader-text'}`}>
+                      {t.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </SettingsGroup>
+            <SettingsGroup label="Fuente">
+              <View className="flex-row flex-wrap gap-2">
+                {FONT_OPTIONS.map((f) => (
+                  <Pressable
+                    key={f.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Fuente ${f.label}`}
+                    onPress={() => update({ fontFamily: f.id })}
+                    className={`min-h-[44px] flex-1 items-center justify-center rounded-xl px-2 ${settings.fontFamily === f.id ? 'bg-accent' : 'bg-hover'}`}
+                  >
+                    <Text className={`text-sm font-semibold ${settings.fontFamily === f.id ? 'text-accent-fg' : 'text-reader-text'}`}>
+                      {f.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </SettingsGroup>
+            <StepperRow
+              label="Tamaño"
+              value={`${String(settings.fontSize)} pt`}
+              onLess={() => update({ fontSize: settings.fontSize - 1 })}
+              onMore={() => update({ fontSize: settings.fontSize + 1 })}
+              lessLabel="Reducir tamaño de letra"
+              moreLabel="Aumentar tamaño de letra"
+            />
+            <StepperRow
+              label="Interlineado"
+              value={settings.lineHeight.toFixed(1)}
+              onLess={() => update({ lineHeight: Math.round((settings.lineHeight - 0.1) * 10) / 10 })}
+              onMore={() => update({ lineHeight: Math.round((settings.lineHeight + 0.1) * 10) / 10 })}
+              lessLabel="Reducir interlineado"
+              moreLabel="Aumentar interlineado"
+            />
+            <StepperRow
+              label="Espaciado"
+              value={settings.letterSpacing.toFixed(1)}
+              onLess={() => update({ letterSpacing: Math.round((settings.letterSpacing - 0.1) * 10) / 10 })}
+              onMore={() => update({ letterSpacing: Math.round((settings.letterSpacing + 0.1) * 10) / 10 })}
+              lessLabel="Reducir espaciado de letras"
+              moreLabel="Aumentar espaciado de letras"
+            />
+            <SettingsGroup label="Mostrar">
+              <ToggleRow
+                label="Números de versículo"
+                value={settings.verseNumbers}
+                onToggle={() => update({ verseNumbers: !settings.verseNumbers })}
+              />
+              <ToggleRow
+                label="Notas al pie"
+                value={settings.footnotes}
+                onToggle={() => update({ footnotes: !settings.footnotes })}
+              />
+            </SettingsGroup>
+            <SettingsGroup label="Ayudas de lectura">
+              <ToggleRow
+                label="Lectura biónica"
+                value={settings.bionicReading}
+                onToggle={() => update({ bionicReading: !settings.bionicReading })}
+              />
+              <ToggleRow
+                label="Puntos silábicos"
+                value={settings.syllablePoints}
+                onToggle={() => update({ syllablePoints: !settings.syllablePoints })}
+              />
+              <ToggleRow
+                label="Line focus (TDAH)"
+                value={settings.lineFocus}
+                onToggle={() => update({ lineFocus: !settings.lineFocus })}
+              />
+              <ToggleRow
+                label="Lectura simple (AAA)"
+                value={settings.simpleReadingMode}
+                onToggle={() => update({ simpleReadingMode: !settings.simpleReadingMode })}
+              />
+            </SettingsGroup>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+function SettingsGroup({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <View className="gap-2">
+      <Text className="text-xs font-bold uppercase text-reader-muted">{label}</Text>
+      {children}
+    </View>
+  )
+}
+
+interface StepperRowProps {
+  label: string
+  value: string
+  onLess(): void
+  onMore(): void
+  lessLabel: string
+  moreLabel: string
+}
+
+function StepperRow({ label, value, onLess, onMore, lessLabel, moreLabel }: StepperRowProps) {
+  return (
+    <View className="flex-row items-center justify-between gap-2">
+      <Text className="flex-1 text-sm text-reader-text">{label}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={lessLabel}
+        onPress={onLess}
+        className="min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-hover active:opacity-70"
+      >
+        <Text className="text-lg text-reader-text">−</Text>
+      </Pressable>
+      <Text className="min-w-[64px] text-center text-sm font-semibold text-reader-text">{value}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={moreLabel}
+        onPress={onMore}
+        className="min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-hover active:opacity-70"
+      >
+        <Text className="text-lg text-reader-text">+</Text>
+      </Pressable>
+    </View>
+  )
+}
+
+function ToggleRow({ label, value, onToggle }: { label: string; value: boolean; onToggle(): void }) {
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      accessibilityLabel={label}
+      onPress={onToggle}
+      className="min-h-[44px] flex-row items-center justify-between rounded-xl bg-hover px-4"
+    >
+      <Text className="text-sm text-reader-text">{label}</Text>
+      <Text className="text-sm font-bold text-reader-text">{value ? 'Sí' : 'No'}</Text>
+    </Pressable>
+  )
+}
+
+interface VerseModalProps {
+  verse: VerseText | null
+  bookName: string
+  chapter: number
+  bookmarked: boolean
+  onToggleBookmark(): void
+  onClose(): void
+}
+
+function VerseModal({ verse, bookName, chapter, bookmarked, onToggleBookmark, onClose }: VerseModalProps) {
+  return (
+    <Modal visible={verse !== null} animationType="slide" transparent onRequestClose={onClose}>
+      <View className="flex-1 justify-end bg-black/40">
+        <View className="gap-3 rounded-t-2xl border-t border-reader-border bg-reader-bg p-5 pb-8">
+          <Text className="text-lg font-bold text-reader-text">
+            {verse !== null ? verseRef(bookName, chapter, verse) : ''}
+          </Text>
+          <Text className="text-sm text-reader-muted" numberOfLines={4}>
+            {verse?.text ?? ''}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={bookmarked ? 'Quitar marcador' : 'Añadir marcador'}
+            onPress={() => {
+              onToggleBookmark()
+              onClose()
+            }}
+            className="min-h-[44px] items-center justify-center rounded-xl bg-accent px-4"
+          >
+            <Text className="text-sm font-semibold text-accent-fg">
+              {bookmarked ? 'Quitar marcador ◆' : 'Añadir marcador'}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Cerrar opciones del versículo"
+            onPress={onClose}
+            className="min-h-[44px] items-center justify-center rounded-xl border border-reader-border px-4"
+          >
+            <Text className="text-sm font-semibold text-reader-text">Cerrar</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+function FootnoteTooltip({ footnote, onClose }: { footnote: Footnote | null; onClose(): void }) {
+  return (
+    <Modal visible={footnote !== null} animationType="fade" transparent onRequestClose={onClose}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Cerrar nota al pie"
+        onPress={onClose}
+        className="flex-1 items-center justify-center bg-black/40 p-8"
+      >
+        <View className="w-full gap-2 rounded-2xl border border-reader-border bg-reader-bg p-4">
+          <Text className="text-xs font-bold uppercase text-reader-muted">
+            Nota {footnote?.caller ?? ''}
+          </Text>
+          <Text className="text-sm text-reader-text">{footnote?.text ?? ''}</Text>
+          <View className="min-h-[44px] items-center justify-center rounded-xl bg-hover">
+            <Text className="text-sm font-semibold text-reader-text">Cerrar</Text>
           </View>
         </View>
-      </Modal>
-    </View>
+      </Pressable>
+    </Modal>
   )
 }

@@ -48,6 +48,9 @@ export const bunSqlite: SqlitePort = {
       async all<T = unknown>(sql: string, params?: ReadonlyArray<string | number | null>) {
         return db.query(sql).all(...(params ?? [])) as T[]
       },
+      async exec(sql: string, params?: ReadonlyArray<string | number | null>) {
+        db.query(sql).run(...(params ?? []))
+      },
       async close() {
         db.close()
       },

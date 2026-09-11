@@ -1,4 +1,4 @@
-import { unzip } from 'fflate'
+import { unzipSync } from 'fflate'
 import { CatalogError, InstallError, ModuleOpenError } from './errors'
 import type { EnginePorts } from './ports'
 import type { CatalogModule, InstalledModule, ModuleManifest } from './types'
@@ -84,10 +84,19 @@ export function validateManifest(raw: unknown, expected: CatalogModule): ModuleM
   return m as unknown as ModuleManifest
 }
 
-async function unzipAmod(bytes: Uint8Array): Promise<Map<string, Uint8Array>> {
-  const entries = await new Promise<Record<string, Uint8Array>>((resolve, reject) => {
-    unzip(bytes, (err, data) => (err ? reject(err) : resolve(data)))
-  })
+/**
+ * Descomprime el .amod de forma SINCRONA a proposito: el `unzip` asincrono de
+ * fflate usa Web Workers (`Worker`), inexistentes en Hermes, y la instalacion
+ * falla en el movil con "Property 'Worker' doesn't exist" (verificado en
+ * emulador Android). Un modulo tipico (~3.5MB) se descomprime en <1s.
+ */
+function unzipAmod(bytes: Uint8Array): Map<string, Uint8Array> {
+  let entries: Record<string, Uint8Array>
+  try {
+    entries = unzipSync(bytes)
+  } catch (error) {
+    throw new InstallError(`.amod corrupto (unzip): ${(error as Error).message}`)
+  }
   const out = new Map<string, Uint8Array>()
   for (const [name, data] of Object.entries(entries)) {
     if (name.endsWith('/')) continue
@@ -118,7 +127,7 @@ export async function installModule(module: CatalogModule, ports: EnginePorts, s
     if (sha256 !== module.sha256.toLowerCase()) {
       throw new InstallError(`sha256 no coincide con el catalogo para ${module.id}: descarga abortada`)
     }
-    const entries = await unzipAmod(bytes)
+    const entries = unzipAmod(bytes)
     const manifestRaw: unknown = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')))
     const manifest = validateManifest(manifestRaw, module)
 
@@ -128,11 +137,10 @@ export async function installModule(module: CatalogModule, ports: EnginePorts, s
     await ports.fs.writeFile(paths.dbPath, entries.get('content.db') as Uint8Array)
 
     const db = await ports.sqlite.openReadOnly(paths.dbPath)
-    try {
-      await validateAmodDb(db, manifest.schemaVersion)
-    } finally {
-      await db.close()
-    }
+    // Sin close(): expo-sqlite ~56 aborta el proceso (SIGABRT en
+    // sqlite3_close) al cerrar bases (ver fts.ts en apps/mobile). La
+    // validacion abre una conexion por instalacion (pocas por sesion).
+    await validateAmodDb(db, manifest.schemaVersion)
 
     const record: InstalledModule = {
       id: manifest.id,
