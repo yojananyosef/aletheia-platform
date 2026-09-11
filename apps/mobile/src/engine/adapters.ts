@@ -79,6 +79,28 @@ class ExpoCryptoAdapter implements CryptoPort {
 
 class ExpoSqliteAdapter implements SqlitePort {
   async openReadOnly(path: string): Promise<SqliteDb> {
+    // Una conexion nativa por ruta y sesion JS (cache a nivel de modulo,
+    // sobrevive a Fast Refresh): cada busqueda global abria una conexion por
+    // modulo y, como close() es intencionadamente no-op (SIGABRT ~56), las
+    // conexiones huerfanas acaban colgando el puente nativo de Expo Go
+    // (prepareAsync → NullPointerException en TODAS las queries, verificado
+    // en emulador 2026-09-11: solo lo arregla un force-stop). Todo nuestro
+    // acceso es de lectura, compartir es seguro.
+    const cached = sharedDbCache.get(path)
+    if (cached) return cached
+    const opened = openSharedReadOnly(path).catch((e) => {
+      if (sharedDbCache.get(path) === opened) sharedDbCache.delete(path)
+      throw e
+    })
+    sharedDbCache.set(path, opened)
+    return opened
+  }
+}
+
+/** Cache de conexiones compartidas por ruta (vive lo que el runtime JS). */
+const sharedDbCache = new Map<string, Promise<SqliteDb>>()
+
+async function openSharedReadOnly(path: string): Promise<SqliteDb> {
     const dir = path.slice(0, path.lastIndexOf('/'))
     const name = path.slice(path.lastIndexOf('/') + 1)
     const db: SQLiteDatabase = await openDatabaseAsync(name, undefined, dir)
@@ -100,7 +122,6 @@ class ExpoSqliteAdapter implements SqlitePort {
       // por modulo y sesion; se liberan al morir el proceso.
       close: () => Promise.resolve(),
     }
-  }
 }
 
 const fetchHttp: HttpPort = {

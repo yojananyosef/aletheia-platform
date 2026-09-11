@@ -8,13 +8,18 @@ import {
   Text,
   View,
 } from 'react-native'
+import { router, useLocalSearchParams } from 'expo-router'
 
 import {
   THEME_TOKENS,
+  TTSOrchestrator,
+  findWordIndexAtOffset,
+  splitWords,
   toBionicSegments,
   toSyllabicText,
   type FontFamilyId,
   type ThemeName,
+  type TTSState,
 } from '@aletheia/core'
 import type {
   BibleBook,
@@ -35,6 +40,7 @@ import {
   type Bookmark,
 } from '@/engine/reading-store'
 import { useSettings } from '@/engine/settings'
+import { speechEngine } from '@/engine/expo-speech-backend'
 import { FONT_FAMILY_NAMES } from '@/theme/typography'
 
 type ChapterItem = { kind: 'heading'; heading: Heading } | { kind: 'verse'; verseIndex: number }
@@ -100,9 +106,23 @@ export default function LeerScreen() {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // TTS bimodal (F3): versiculo en curso + palabra del karaoke + estado.
+  const [ttsState, setTtsState] = useState<TTSState>('idle')
+  const [ttsVerseIndex, setTtsVerseIndex] = useState<number | null>(null)
+  const [ttsWordIndex, setTtsWordIndex] = useState<number | null>(null)
+  const [ttsRate, setTtsRate] = useState(1)
+  const [ttsError, setTtsError] = useState<string | null>(null)
 
   const handleRef = useRef<OpenedBible | null>(null)
   const moduleIdRef = useRef<string | null>(null)
+  // Deep-link ?verse=N (desde Buscar): enfoca ese versiculo al cargar.
+  const searchParams = useLocalSearchParams<{ verse?: string }>()
+  const linkedVerse =
+    typeof searchParams.verse === 'string' ? Number.parseInt(searchParams.verse, 10) : NaN
+  const ttsRef = useRef<TTSOrchestrator | null>(null)
+  const ttsPassageRef = useRef<Array<{ verse: number; text: string }>>([])
+  const scrollRef = useRef<ScrollView | null>(null)
+  const verseYRef = useRef(new Map<number, number>())
   // El long-press sobre una nota abre su tooltip; evita que el long-press
   // del versiculo (VerseModal) dispare a la vez.
   const suppressVerseModalUntil = useRef(0)
@@ -189,7 +209,15 @@ export default function LeerScreen() {
       .then((c) => {
         if (!active) return
         setContent(c)
-        setFocusedVerse(c.verses[0]?.verse ?? null)
+        const linked = Number.isInteger(linkedVerse) && c.verses.some((v) => v.verse === linkedVerse)
+        setFocusedVerse(linked ? linkedVerse : (c.verses[0]?.verse ?? null))
+        if (linked) {
+          // Espera al layout para el autoscroll al versiculo enlazado.
+          setTimeout(() => {
+            const y = verseYRef.current.get(linkedVerse)
+            if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(0, y - 120), animated: true })
+          }, 350)
+        }
       })
       .catch((e) => {
         if (active) {
@@ -214,6 +242,105 @@ export default function LeerScreen() {
       chapter,
     })
   }, [engine, moduleId, book, chapter])
+
+  const stopTts = useCallback(() => {
+    ttsRef.current?.dispose()
+    ttsRef.current = null
+    ttsPassageRef.current = []
+    setTtsVerseIndex(null)
+    setTtsWordIndex(null)
+    setTtsState('idle')
+  }, [])
+
+  // Cambiar de capitulo/modulo detiene la narracion (el pasaje ya no vale).
+  useEffect(() => {
+    stopTts()
+    verseYRef.current.clear()
+  }, [content, stopTts])
+
+  useEffect(() => {
+    return () => {
+      ttsRef.current?.dispose()
+      ttsRef.current = null
+    }
+  }, [])
+
+  const startTts = useCallback(
+    (fromIndex: number, rate: number) => {
+      if (content === null || book === null) return
+      ttsRef.current?.dispose()
+      setTtsError(null)
+      const items = content.verses.map((v) => ({ verse: v.verse, text: v.text }))
+      ttsPassageRef.current = items
+      const orch = new TTSOrchestrator(
+        speechEngine,
+        { book: book.osisCode, chapter, items },
+        { rate, lang: 'en' },
+        {
+          onVerseStart: (verse, index) => {
+            setTtsVerseIndex(index)
+            setTtsWordIndex(null)
+            setFocusedVerse(verse)
+            const y = verseYRef.current.get(verse)
+            if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(0, y - 120), animated: true })
+          },
+          onBoundary: (_verse, index, boundary) => {
+            const text = ttsPassageRef.current[index]?.text
+            if (text === undefined) return
+            setTtsVerseIndex(index)
+            setTtsWordIndex(findWordIndexAtOffset(text, boundary.charIndex))
+          },
+          onStateChange: (s) => {
+            setTtsState(s)
+            if (s === 'finished' || s === 'stopped') {
+              setTtsVerseIndex(null)
+              setTtsWordIndex(null)
+            }
+          },
+          onFinish: () => {},
+          onError: (e) => setTtsError(e.message),
+        },
+      )
+      ttsRef.current = orch
+      // seekToIndex en idle reposiciona sin arrancar; play() narra desde ahi.
+      if (fromIndex > 0 && items.length > 0) {
+        orch.seekToIndex(Math.min(fromIndex, items.length - 1))
+      }
+      orch.play()
+      setTtsState(orch.state)
+    },
+    [book, chapter, content],
+  )
+
+  const toggleTts = useCallback(() => {
+    const orch = ttsRef.current
+    if (ttsState === 'playing') {
+      orch?.pause()
+      return
+    }
+    if (ttsState === 'paused') {
+      orch?.resume()
+      return
+    }
+    // idle/stopped/finished: arrancar desde el versiculo enfocado si lo hay.
+    let fromIndex = 0
+    if (content !== null && focusedVerse !== null) {
+      const i = content.verses.findIndex((v) => v.verse === focusedVerse)
+      if (i >= 0) fromIndex = i
+    }
+    startTts(fromIndex, ttsRate)
+  }, [content, focusedVerse, startTts, ttsRate, ttsState])
+
+  const cycleTtsRate = useCallback(() => {
+    const RATES = [0.85, 1, 1.25]
+    const next = RATES[(RATES.indexOf(ttsRate) + 1) % RATES.length] ?? 1
+    setTtsRate(next)
+    // La voz se fija al construir el orquestador: si suena, reinicia ahi mismo.
+    if (ttsState === 'playing' || ttsState === 'paused') {
+      const at = ttsVerseIndex ?? 0
+      startTts(at, next)
+    }
+  }, [startTts, ttsRate, ttsState, ttsVerseIndex])
 
   const bookmarkSet = useMemo(
     () => new Set(bookmarks.map((b) => bookmarkKey(b))),
@@ -365,6 +492,49 @@ export default function LeerScreen() {
             <Text className="text-xl text-reader-text">›</Text>
           </Pressable>
         </View>
+        <View className="flex-row items-center justify-center gap-2">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              ttsState === 'playing' ? 'Pausar lectura en voz alta' : 'Leer en voz alta'
+            }
+            onPress={toggleTts}
+            className="min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-accent px-4 active:opacity-70"
+          >
+            <Text className="text-base font-bold text-accent-fg">
+              {ttsState === 'playing' ? '⏸' : ttsState === 'paused' ? '▶' : '🔊'}
+            </Text>
+          </Pressable>
+          {ttsState === 'playing' || ttsState === 'paused' ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Detener lectura en voz alta"
+              onPress={stopTts}
+              className="min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-hover px-4 active:opacity-70"
+            >
+              <Text className="text-base font-bold text-reader-text">■</Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Velocidad de lectura ${ttsRate.toFixed(2)}x, toca para cambiar`}
+            onPress={cycleTtsRate}
+            className="min-h-[44px] items-center justify-center rounded-xl bg-hover px-4 active:opacity-70"
+          >
+            <Text className="text-sm font-semibold text-reader-text">{`${ttsRate.toFixed(2)}×`}</Text>
+          </Pressable>
+          <Text className="text-xs text-reader-muted">
+            {ttsState === 'playing'
+              ? ttsVerseIndex !== null && content !== null
+                ? `Leyendo v.${String(content.verses[ttsVerseIndex]?.verse ?? '')}`
+                : 'Leyendo…'
+              : ttsState === 'paused'
+                ? 'Pausado'
+                : ttsError !== null
+                  ? ttsError
+                  : 'TTS'}
+          </Text>
+        </View>
       </View>
 
       {loading ? (
@@ -381,7 +551,7 @@ export default function LeerScreen() {
           <Text className="text-sm text-reader-muted">Capítulo vacío.</Text>
         </View>
       ) : (
-        <ScrollView contentContainerClassName="px-5 pb-10 pt-3">
+        <ScrollView ref={scrollRef} contentContainerClassName="px-5 pb-10 pt-3">
           <Text style={baseTextStyle} className="text-reader-text">
             {items.map((item, i) =>
               item.kind === 'heading' ? (
@@ -401,8 +571,7 @@ export default function LeerScreen() {
                   showVerseNumbers={settings.verseNumbers}
                   footnotes={footnotesByVerse.get(content.verses[item.verseIndex]?.verse ?? -1) ?? []}
                   showFootnotes={showFootnotes}
-                  bookmarked={
-                    moduleId !== null &&
+                  bookmarked={                    moduleId !== null &&
                     book !== null &&
                     bookmarkSet.has(
                       bookmarkKey({
@@ -418,7 +587,14 @@ export default function LeerScreen() {
                     focusedVerse !== null &&
                     content.verses[item.verseIndex]?.verse !== focusedVerse
                   }
-                  onFocus={() => setFocusedVerse(content.verses[item.verseIndex]?.verse ?? null)}
+                  onFocus={() => {
+                    const v = content.verses[item.verseIndex]?.verse ?? null
+                    setFocusedVerse(v)
+                    // Tocar otro versiculo mientras suena salta la narracion ahi.
+                    if (ttsState === 'playing' && ttsRef.current !== null) {
+                      ttsRef.current.seekToIndex(item.verseIndex)
+                    }
+                  }}
                   onOpenModal={() => {
                     if (Date.now() < suppressVerseModalUntil.current) return
                     const v = content.verses[item.verseIndex]
@@ -432,6 +608,13 @@ export default function LeerScreen() {
                     suppressVerseModalUntil.current = Date.now() + 600
                   }}
                   renderText={renderVerseText}
+                  ttsActive={ttsVerseIndex === item.verseIndex && ttsState === 'playing'}
+                  ttsWord={ttsVerseIndex === item.verseIndex ? ttsWordIndex : null}
+                  ttsHighlightColor={THEME_TOKENS[settings.theme].accentSubtle}
+                  onMeasureY={(y) => {
+                    const v = content.verses[item.verseIndex]?.verse
+                    if (v !== undefined) verseYRef.current.set(v, y)
+                  }}
                 />
               ),
             )}
@@ -468,6 +651,7 @@ export default function LeerScreen() {
       <VerseModal
         verse={modalVerse}
         bookName={book?.name ?? ''}
+        osisCode={book?.osisCode ?? ''}
         chapter={chapter}
         bookmarked={
           modalVerse !== null &&
@@ -499,6 +683,11 @@ interface VerseRowProps {
   showFootnotes: boolean
   bookmarked: boolean
   dimmed: boolean
+  /** Karaoke TTS: resalta la palabra en curso del versiculo que suena. */
+  ttsActive: boolean
+  ttsWord: number | null
+  ttsHighlightColor: string
+  onMeasureY(y: number): void
   onFocus(): void
   onOpenModal(): void
   onOpenFootnote(f: Footnote): void
@@ -517,6 +706,10 @@ function VerseRow({
   showFootnotes,
   bookmarked,
   dimmed,
+  ttsActive,
+  ttsWord,
+  ttsHighlightColor,
+  onMeasureY,
   onFocus,
   onOpenModal,
   onOpenFootnote,
@@ -531,8 +724,12 @@ function VerseRow({
       accessibilityHint="Toca para enfocar, mantén para opciones del versículo"
       onPress={onFocus}
       onLongPress={onOpenModal}
+      onLayout={(e) => onMeasureY(e.nativeEvent.layout.y)}
       delayLongPress={350}
-      style={dimmed ? { opacity: 0.35 } : undefined}
+      style={[
+        dimmed ? { opacity: 0.35 } : undefined,
+        ttsActive ? { backgroundColor: ttsHighlightColor } : undefined,
+      ]}
     >
       <Text style={baseStyle} className="text-reader-text">
         {bookmarked ? <Text style={{ color: verseNumberColor }}>{'◆ '}</Text> : null}
@@ -542,7 +739,11 @@ function VerseRow({
             {verseLabel(verse)}{' '}
           </Text>
         ) : null}
-        {renderText(verse.text, baseStyle.fontSize, verseNumberColor)}
+        {ttsActive ? (
+          <KaraokeText text={verse.text} activeWord={ttsWord} baseSize={baseStyle.fontSize} />
+        ) : (
+          renderText(verse.text, baseStyle.fontSize, verseNumberColor)
+        )}
         {showFootnotes
           ? footnotes.map((f, k) => (
               <Text
@@ -566,6 +767,32 @@ function VerseRow({
         {' '}
       </Text>
     </Pressable>
+  )
+}
+
+/** Palabra-por-palabra del karaoke TTS (read-aloud): boundary -> palabra activa. */
+function KaraokeText({
+  text,
+  activeWord,
+  baseSize,
+}: {
+  text: string
+  activeWord: number | null
+  baseSize: number
+}) {
+  const words = splitWords(text)
+  return (
+    <Text>
+      {words.map((w, i) => (
+        <Text
+          key={i}
+          style={i === activeWord ? { fontWeight: '700', fontSize: baseSize * 1.06 } : undefined}
+        >
+          {w.word}
+          {' '}
+        </Text>
+      ))}
+    </Text>
   )
 }
 
@@ -855,13 +1082,14 @@ function ToggleRow({ label, value, onToggle }: { label: string; value: boolean; 
 interface VerseModalProps {
   verse: VerseText | null
   bookName: string
+  osisCode: string
   chapter: number
   bookmarked: boolean
   onToggleBookmark(): void
   onClose(): void
 }
 
-function VerseModal({ verse, bookName, chapter, bookmarked, onToggleBookmark, onClose }: VerseModalProps) {
+function VerseModal({ verse, bookName, osisCode, chapter, bookmarked, onToggleBookmark, onClose }: VerseModalProps) {
   return (
     <Modal visible={verse !== null} animationType="slide" transparent onRequestClose={onClose}>
       <View className="flex-1 justify-end bg-black/40">
@@ -872,6 +1100,22 @@ function VerseModal({ verse, bookName, chapter, bookmarked, onToggleBookmark, on
           <Text className="text-sm text-reader-muted" numberOfLines={4}>
             {verse?.text ?? ''}
           </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Abrir en Estudio con comentario y diccionario"
+            onPress={() => {
+              if (verse !== null && osisCode.length > 0) {
+                onClose()
+                router.push({
+                  pathname: '/estudio',
+                  params: { osis: osisCode, chapter: String(chapter), verse: String(verse.verse) },
+                })
+              }
+            }}
+            className="min-h-[44px] items-center justify-center rounded-xl bg-accent px-4"
+          >
+            <Text className="text-sm font-semibold text-accent-fg">Estudiar pasaje</Text>
+          </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={bookmarked ? 'Quitar marcador' : 'Añadir marcador'}

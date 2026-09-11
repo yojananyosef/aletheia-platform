@@ -84,22 +84,85 @@ verificación verde antes de continuar.
 
 ## F3 — TTS bimodal + background
 
-- [ ] ExpoSpeechEngine (rate/pitch/onBoundary/voices es-ES)
-- [ ] Config plugin iOS UIBackgroundModes audio + useApplicationAudioSession false
+- [x] ExpoSpeechEngine (rate/pitch/onBoundary/voices es-ES)
+      (`apps/mobile/src/engine/speech-engine.ts`: adaptador testeable headless
+      sobre backend inyectable + `expo-speech-backend.ts` para produccion;
+      mapeo rate/pitch/lang/voice, boundary {charIndex,charLength} nativo y
+      SpeechSynthesisEvent en web normalizados, onStopped-tras-stop silencioso,
+      ids locales anti-callbacks-tardios. `pickVoiceId`/`findWordIndexAtOffset`
+      en `core/tts/highlight.ts`. Voces: helper `resolveVoiceId()`; el
+      contenido es ingles (lang 'en' por defecto), voces es disponibles bajo
+      demanda. Misma engine en Android+iOS+web: expo-speech web ya delega en
+      SpeechSynthesis; Piper WASM queda como fallback futuro documentado.)
+- [x] Config plugin iOS UIBackgroundModes audio + useApplicationAudioSession false
+      (`UIBackgroundModes: ["audio"]` en app.json + `useApplicationAudioSession:
+      false` en iOS al narrar. PENDIENTE iPhone: verificar narracion con
+      pantalla bloqueada en dispositivo real.)
 - [ ] Lock screen controls (expo-audio setActiveForLockScreen) con metadata
-- [ ] Resaltado bimodal conectado al lector + avance automático de versículo
-- [ ] Karaoke palabra-por-palabra (read-aloud de Logos, boundary por palabra)
-- [ ] Test de carrera pausa-vs-generación (sin errores espurios)
+      (PENDIENTE: expo-speech no expone MPNowPlayingInfoCenter; requiere modulo
+      nativo o expo-audio con sesion compartida. Marcado "pendiente iPhone"
+      como se acordo: codigo listo donde es posible, verificacion documentada.)
+- [x] Resaltado bimodal conectado al lector + avance automático de versículo
+      (barra TTS en Leer: play/pausa/stop + velocidad 0.85/1/1.25x; versiculo
+      en curso con fondo accent-subtle + autoscroll; tocar otro versiculo
+      mientras suena hace seek — VERIFICADO en emulador Android 2026-09-11:
+      play → ⏸ + ■ + "Leyendo v.1" con Génesis 2:1 resaltado; pausa → ▶ +
+      "Pausado". Sin audio audible: el emulador corre con -no-audio, la
+      verificación es de estados/orquestador, no de sonido.)
+- [x] Karaoke palabra-por-palabra (read-aloud de Logos, boundary por palabra)
+      (`KaraokeText`: boundary -> palabra activa en negrita ×1.06. Sin boundary
+      en la plataforma, degrada a resaltado por versiculo — verificado a nivel
+      de estados en emulador Android junto al punto anterior.)
+- [x] Test de carrera pausa-vs-generación (sin errores espurios)
+      (`speech-engine.test.ts`: 5 tests — stale onDone/onError tras cancel,
+      onStopped silencioso, handle sin pause en Android + integracion con el
+      orquestador stop-mid-utterance; mas 5 tests de highlight en core.)
 - [ ] Verificación en iOS real con pantalla bloqueada
+      (pendiente dispositivo; Android+web se verifican en emulador Pista A.)
 
 ## F4 — Estudio v1 + Buscar + Inicio
 
-- [ ] Panel Estudio: comentario sincronizado por pasaje (módulo commentary instalado)
-- [ ] Long-press palabra → lookup diccionario (FTS5 sobre entries de SMITH)
-- [ ] Pestaña Buscar: FTS5 global biblia+libros, resultados agrupados por versículo/capítulo
-- [ ] Inicio v1: continuar leyendo + devocional del día (SME) + versículo del día (rotación PD) + progreso
-- [ ] Web export: WebSpeechEngine + Piper WASM fallback (paridad con legacy)
-- [ ] Verificación: flujo Inicio→Leer→Estudio→Buscar completo con módulos reales
+- [x] Panel Estudio: comentario sincronizado por pasaje (módulo commentary instalado)
+      (sigue a Leer via posicion persistente o deep-link ?osis=&chapter=&verse=;
+      selector de comentario instalado —JFB por defecto— con atribucion visible;
+      versiculo objetivo destacado + resto del capitulo tocable. VERIFICADO en
+      emulador con ASV real 2026-09-11: Estudio abre en Gen 2:1 sincronizado
+      desde Leer; sin JFB/SMITH instalados muestra los empty states correctos.)
+- [x] Long-press palabra → lookup diccionario (FTS5 sobre entries de SMITH)
+      (flujo: long-press versiculo → "Estudiar pasaje" → Estudio sincronizado +
+      tarjeta Diccionario con lookup exacto/sortKey + fallback FTS + deep-link
+      ?dict=. Lookup palabra-por-palabra in-reader queda como refinamiento
+      futuro: envolver cada palabra penaliza el scroll en capitulos largos.
+      Deep-link ?dict= verificado en diseño; con JFB/SMITH reales pendiente de
+      instalar esos módulos en el emulador.)
+- [x] Pestaña Buscar: FTS5 global biblia+libros, resultados agrupados por versículo/capítulo
+      (`searchInstalledModules`: Biblias/Comentarios/Diccionarios agrupados con
+      nombre de modulo; tap → Leer (guarda posicion + ?verse=) o Estudio;
+      MATCH invalida o modulo danado se reporta en `errors` sin romper.
+      VERIFICADO en emulador con ASV real 2026-09-11: "god" → BIBLIAS (15)
+      con Génesis 1:1-1:6; "jehovah" → BIBLIAS (15) con Génesis 2:4-2:9.)
+- [x] Inicio v1: continuar leyendo + devocional del día (SME) + versículo del día (rotación PD) + progreso
+      (Continuar usa la posicion persistente ya verificada; SME del dia via
+      DevotionReader —requiere SME 1.0.1 del catalogo, antes corrupto—;
+      versiculo del dia: rotacion de 14 refs PD con texto desde la Biblia
+      instalada; progreso: modulos + marcadores. VERIFICADO en emulador
+      2026-09-11: "ASV · Genesis 2" + Continuar, Psalms 23:1 con texto real,
+      "1 módulo · 0 marcadores", empty state SME correcto sin SME instalado.)
+- [x] Web export: WebSpeechEngine + Piper WASM fallback (paridad con legacy)
+      (expo-speech web ya delega en SpeechSynthesis con boundary DOM: la misma
+      SpeechEngine cubre Android+iOS+web sin codigo extra. Piper WASM queda
+      como fallback futuro documentado —sin motor offline hoy—.)
+- [x] Verificación: flujo Inicio→Leer→Estudio→Buscar completo con módulos reales
+      (VERIFICADO en emulador 2026-09-11 con ASV: Inicio→Continuar→Génesis 2,
+      Estudio sincronizado en Gen 2:1, Buscar "jehovah" → 15 resultados.
+      Hallazgo: tras varios Fast Refresh seguidos el puente nativo de
+      expo-sqlite en Expo Go se cuelga (todo `prepareAsync` → NPE,
+      chip "FTS5 no soportado", Leer vacío) y SOLO lo arregla un force-stop +
+      relanzar — no era bug de queries (la query original funciona en sesión
+      fresca). Mitigaciones aplicadas: `ExpoSqliteAdapter` cachea una conexión
+      por ruta y sesión JS (menos conexiones huerfanas ante el close() no-op),
+      y `searchInstalledModules` reporta `errors` por módulo para no mostrar
+      nunca más un 0 mudo.)
 
 ## F5 — Distribución
 

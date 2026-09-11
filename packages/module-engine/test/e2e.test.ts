@@ -38,9 +38,9 @@ afterAll(async () => {
 })
 
 describe('E2E engine: catalogo real → instalar ASV → leer Genesis 1:1', () => {
-  test('el catalogo real trae los 4 modulos v1 con licencia visible', () => {
+  test('el catalogo real trae los 6 modulos v1.1 con licencia visible', () => {
     expect(catalog.format).toBe('amf-catalog')
-    expect(catalog.modules.map((m) => m.id).sort()).toEqual(['ASV', 'KJV', 'SME', 'SMITH'])
+    expect(catalog.modules.map((m) => m.id).sort()).toEqual(['ASV', 'JFB', 'KJV', 'SME', 'SMITH', 'WEB'])
     for (const m of catalog.modules) {
       expect(m.license.length).toBeGreaterThan(0)
       expect(m.attribution.length).toBeGreaterThan(0)

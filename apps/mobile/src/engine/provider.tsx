@@ -4,6 +4,9 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import {
   BibleReader,
   CatalogService,
+  CommentaryReader,
+  DevotionReader,
+  DictionaryReader,
   installModule,
   ModuleRegistry,
   openInstalledModule,
@@ -25,6 +28,9 @@ interface EngineContextValue {
   install(module: CatalogModule): Promise<InstalledModule>
   remove(id: string): Promise<void>
   openBibleReader(moduleId: string): Promise<{ reader: BibleReader; close(): Promise<void> }>
+  openCommentaryReader(moduleId: string): Promise<{ reader: CommentaryReader; close(): Promise<void> }>
+  openDictionaryReader(moduleId: string): Promise<{ reader: DictionaryReader; close(): Promise<void> }>
+  openDevotionReader(moduleId: string): Promise<{ reader: DevotionReader; close(): Promise<void> }>
 }
 
 const EngineContext = createContext<EngineContextValue | null>(null)
@@ -54,6 +60,18 @@ export function EngineProvider({ children }: { children: ReactNode }) {
           reader,
           close: () => opened.db.close().catch(() => {}),
         }
+      },
+      openCommentaryReader: async (moduleId: string) => {
+        const opened = await openInstalledModule(ports, sandboxDir, moduleId)
+        return { reader: new CommentaryReader(opened.db), close: () => opened.db.close().catch(() => {}) }
+      },
+      openDictionaryReader: async (moduleId: string) => {
+        const opened = await openInstalledModule(ports, sandboxDir, moduleId)
+        return { reader: new DictionaryReader(opened.db), close: () => opened.db.close().catch(() => {}) }
+      },
+      openDevotionReader: async (moduleId: string) => {
+        const opened = await openInstalledModule(ports, sandboxDir, moduleId)
+        return { reader: new DevotionReader(opened.db), close: () => opened.db.close().catch(() => {}) }
       },
     }
   }, [])
