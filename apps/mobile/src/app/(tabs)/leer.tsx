@@ -10,7 +10,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native'
-import { router, useLocalSearchParams } from 'expo-router'
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 
 import {
   THEME_TOKENS,
@@ -176,19 +176,24 @@ export default function LeerScreen() {
     }
   }, [engine])
 
-  useEffect(() => {
-    let active = true
-    void openFirstBible()
-      .catch((e) => {
-        if (active) setError((e as Error).message)
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
-    return () => {
-      active = false
-    }
-  }, [openFirstBible])
+  // Al enfocar: abre la primera Biblia si no hay ninguna abierta (p. ej.
+  // instalada desde Biblioteca mientras Leer mostraba el empty state).
+  // Con modulo ya abierto no hace nada (openFirstBible retorna temprano).
+  useFocusEffect(
+    useCallback(() => {
+      let active = true
+      void openFirstBible()
+        .catch((e) => {
+          if (active) setError((e as Error).message)
+        })
+        .finally(() => {
+          if (active) setLoading(false)
+        })
+      return () => {
+        active = false
+      }
+    }, [openFirstBible]),
+  )
 
   useEffect(() => {
     let active = true

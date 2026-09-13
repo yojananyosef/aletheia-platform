@@ -1,3 +1,4 @@
+import { useFocusEffect } from 'expo-router'
 import { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
@@ -52,6 +53,13 @@ export default function BibliotecaScreen() {
       .then(setFts)
       .catch(() => setFts(false))
   }, [loadCatalog, loadInstalled])
+
+  // Al volver a la pestana, relee instalados (cambios via OTA o file system).
+  useFocusEffect(
+    useCallback(() => {
+      void loadInstalled()
+    }, [loadInstalled]),
+  )
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)

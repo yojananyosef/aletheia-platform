@@ -1,5 +1,5 @@
-import { Link, router } from 'expo-router'
-import { useCallback, useEffect, useState } from 'react'
+import { Link, router, useFocusEffect } from 'expo-router'
+import { useCallback, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
 
 import { verseOfDayRef, verseRefLabel } from '@aletheia/core'
@@ -97,9 +97,12 @@ export default function InicioScreen() {
     }
   }, [engine])
 
-  useEffect(() => {
-    void refresh()
-  }, [refresh])
+  // Recarga al enfocar: lo instalado desde Biblioteca se refleja al volver.
+  useFocusEffect(
+    useCallback(() => {
+      void refresh()
+    }, [refresh]),
+  )
 
   return (
     <ScrollView className="flex-1 bg-reader-bg" contentContainerClassName="gap-4 p-5 pb-10">

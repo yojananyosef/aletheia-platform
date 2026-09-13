@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 
@@ -60,25 +60,33 @@ export default function EstudioScreen() {
     }
   }, [engine, params.osis, params.chapter, params.verse])
 
-  useEffect(() => {
-    let active = true
-    void engine.registry
-      .list()
-      .then((list) => {
-        if (!active) return
-        const enabled = list.filter((m) => m.enabled)
-        const comms = enabled.filter((m) => m.type === 'commentary')
-        const dicts = enabled.filter((m) => m.type === 'dictionary' || m.type === 'lexicon')
-        setCommentaries(comms)
-        setDictionaries(dicts)
-        setSelCommId((prev) => prev ?? comms.find((m) => m.id === 'JFB')?.id ?? comms[0]?.id ?? null)
-        setSelDictId((prev) => prev ?? dicts.find((m) => m.id === 'SMITH')?.id ?? dicts[0]?.id ?? null)
-      })
-      .catch(() => {})
-    return () => {
-      active = false
-    }
+  // Recarga al enfocar la pestana: un modulo instalado desde Biblioteca
+  // aparece en tiempo real sin remontar la pantalla. Si el seleccionado se
+  // desinstalo fuera, se reelige (JFB/SMITH primero).
+  const loadModules = useCallback(async () => {
+    const list = await engine.registry.list().catch(() => [])
+    const enabled = list.filter((m) => m.enabled)
+    const comms = enabled.filter((m) => m.type === 'commentary')
+    const dicts = enabled.filter((m) => m.type === 'dictionary' || m.type === 'lexicon')
+    setCommentaries(comms)
+    setDictionaries(dicts)
+    setSelCommId((prev) =>
+      prev !== null && comms.some((m) => m.id === prev)
+        ? prev
+        : (comms.find((m) => m.id === 'JFB')?.id ?? comms[0]?.id ?? null),
+    )
+    setSelDictId((prev) =>
+      prev !== null && dicts.some((m) => m.id === prev)
+        ? prev
+        : (dicts.find((m) => m.id === 'SMITH')?.id ?? dicts[0]?.id ?? null),
+    )
   }, [engine])
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadModules()
+    }, [loadModules]),
+  )
 
   // Comentario sincronizado por pasaje (comentario real, no fixture).
   useEffect(() => {
@@ -204,10 +212,14 @@ export default function EstudioScreen() {
           </View>
         )}
         {entries === null ? (
-          <View className="items-center gap-2 py-4">
-            <ActivityIndicator color="#7a6a4f" />
-            <Text className="text-sm text-reader-muted">Cargando comentario…</Text>
-          </View>
+          // Sin comentarios instalados no hay nada que cargar: el aviso de
+          // arriba ya lo explica. El spinner solo cuando hay seleccion.
+          commentaries.length > 0 ? (
+            <View className="items-center gap-2 py-4">
+              <ActivityIndicator color="#7a6a4f" />
+              <Text className="text-sm text-reader-muted">Cargando comentario…</Text>
+            </View>
+          ) : null
         ) : entries.length === 0 ? (
           <Text className="text-sm text-reader-muted">
             {commError ?? 'Este comentario no cubre el pasaje.'}
