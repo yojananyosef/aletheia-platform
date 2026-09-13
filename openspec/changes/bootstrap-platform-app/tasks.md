@@ -184,9 +184,10 @@ verificación verde antes de continuar.
        (`ndk.abiFilters` en app/build.gradle) se inyecto en EAS (probado en
        logs) pero NO adelgazo: el plugin de Gradle de RN lo sobrescribe con
        `reactNativeArchitectures`. Fix en `7981882` (propiedad en
-       gradle.properties via `withGradleProperties`). PENDIENTE: rebuild
-       preview REMOTO en EAS (el build local se descarto: hardware limitado)
-       y verificar `lib/` solo `arm64-v8a` + ~45-55MB.)
+       gradle.properties via `withGradleProperties`). RESUELTO: rebuild
+       remoto `d75b93db` FINISHED (SDK 57) → APK de 51.430.906 B con SOLO
+       `lib/arm64-v8a` (86.6MB descomprimido). PENDIENTE: instalar este APK
+       en el teléfono y pase en dispositivo.)
 - [x] EAS Submit Play Console con listings ES (App Store Connect — DEFERRED-iOS)
       (Listings ES en `apps/mobile/store/play-listing-es/` + checklist con
       `track: internal`. Play Console ARCHIVADO 2026-09-12 (ver Deferred-PlayConsole:
@@ -198,9 +199,9 @@ verificación verde antes de continuar.
        publicado en rama `preview` (grupo 8b6566f3, runtime 1.0.0, android+ios;
        mensaje "F5: tabs + index redirect, columnas 1/2/auto, ayuda offline,
        ABI arm64 preview"). El APK preview instalado lo recibe al siguiente
-       arranque. PENDIENTE 2.º OTA: SDK 57, refresh-on-focus,
-       fix spinner Estudio, pin catalogo v1.3.0 y puntero latest estan
-       commiteados (hasta `68e748b`) pero aun no publicados.)
+       arranque. VERIFICADO 2026-09-13: 2.º OTA publicado en `preview`
+       (grupo 15e21561, runtime 1.0.0, commit 7539780: SDK 57,
+       refresh-on-focus, fix spinner Estudio, pin v1.3.0, puntero latest).)
 - [x] Export web funcionando + ayuda local embebida (Piper WASM = fallback futuro documentado)
        (VERIFICADO 2026-09-11 en Chromium contra dist real: Biblioteca con catálogo
        (entonces 14 módulos; hoy 17 con APF/CREEDS/VINCENT), chip "FTS5 verificado ✓",
