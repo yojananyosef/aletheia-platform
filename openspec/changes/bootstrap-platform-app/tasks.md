@@ -18,7 +18,11 @@ verificación verde antes de continuar.
 
 ## F1 — Shell Expo + datos reales
 
-- [x] `apps/mobile`: Expo SDK 56 + Expo Router + NativeWind/Uniwind + tipos estrictos
+- [x] `apps/mobile`: Expo SDK 57 + Expo Router + NativeWind/Uniwind + tipos estrictos
+      (actualizado 2026-09-13: `expo install expo@^57 --fix` → expo 57.0.22,
+      RN 0.86.3, router 57; upgrade menor sin breaking changes. Resuelve la
+      regresion Hermes V1 del doctor: 20/21 checks, solo queda el falso
+      positivo de duplicados por installs aislados de bun.)
 - [x] Tokens de tema (pergamino/sepia/noche) + expo-font (OpenDyslexic/Atkinson/Literata)
 - [x] Pantalla Biblioteca: catálogo con fichas (licencia/attribution visibles) + instalar
 - [x] Pantalla Leer mínima: capítulo desde módulo instalado, navegación capítulos
@@ -174,8 +178,15 @@ verificación verde antes de continuar.
       (`apps/mobile/eas.json`: preview APK interno + production AAB, `bun: 1.4.2`
       en ambos perfiles —el worker trae bun 1.3.13 y no lee `bun.lock` v2—,
       cuenta @johangutierrez vinculada (projectId d927ae7d).
-      VERIFICADO 2026-09-12: build preview FINISHED en EAS, APK listo para el
-      físico. PENDIENTE: instalar en el teléfono y pase en dispositivo.)
+       VERIFICADO 2026-09-12: build preview FINISHED en EAS, APK listo para el
+       físico. PENDIENTE: instalar en el teléfono y pase en dispositivo.
+       Saga peso 2026-09-13: APKs de ~116-117MB con 4 ABIs. El plugin v1
+       (`ndk.abiFilters` en app/build.gradle) se inyecto en EAS (probado en
+       logs) pero NO adelgazo: el plugin de Gradle de RN lo sobrescribe con
+       `reactNativeArchitectures`. Fix en `7981882` (propiedad en
+       gradle.properties via `withGradleProperties`). PENDIENTE: rebuild
+       preview REMOTO en EAS (el build local se descarto: hardware limitado)
+       y verificar `lib/` solo `arm64-v8a` + ~45-55MB.)
 - [x] EAS Submit Play Console con listings ES (App Store Connect — DEFERRED-iOS)
       (Listings ES en `apps/mobile/store/play-listing-es/` + checklist con
       `track: internal`. Play Console ARCHIVADO 2026-09-12 (ver Deferred-PlayConsole:
@@ -187,19 +198,23 @@ verificación verde antes de continuar.
        publicado en rama `preview` (grupo 8b6566f3, runtime 1.0.0, android+ios;
        mensaje "F5: tabs + index redirect, columnas 1/2/auto, ayuda offline,
        ABI arm64 preview"). El APK preview instalado lo recibe al siguiente
-       arranque.)
+       arranque. PENDIENTE 2.º OTA: SDK 57, refresh-on-focus,
+       fix spinner Estudio, pin catalogo v1.3.0 y puntero latest estan
+       commiteados (hasta `68e748b`) pero aun no publicados.)
 - [x] Export web funcionando + ayuda local embebida (Piper WASM = fallback futuro documentado)
-      (VERIFICADO 2026-09-11 en Chromium contra dist real: Biblioteca con catálogo
-      (14 módulos), chip "FTS5 verificado ✓", instalación ASV con sha256, Leer con
-      Génesis, Buscar "god" → Biblias (15), Inicio→Continuar persistente. Stack:
-      `adapters.web.ts` (OPFS + @sqlite.org/sqlite-wasm con FTS5 via deserialize;
-      sql.js y wa-sqlite se descartaron: vienen SIN FTS5) + `metro.config.js`
-      mapea `sqlite3-worker1.mjs`. Consola limpia, 0 errores.
-      BLOQUEO EXTERNO: la descarga directa de .amod falla en navegador por CORS
-      (`github.com/releases` no envía ACAO; el fetch lo probó el E2E con intercept
-      local). Requiere fix en aletheia-catalog: releaseBase con CORS (p. ej. host
-      con `Access-Control-Allow-Origin: *`); el engine ya valida sha256 sea cual
-      sea el host, el cambio es seguro.)
+       (VERIFICADO 2026-09-11 en Chromium contra dist real: Biblioteca con catálogo
+       (entonces 14 módulos; hoy 17 con APF/CREEDS/VINCENT), chip "FTS5 verificado ✓",
+       instalación ASV con sha256, Leer con Génesis, Buscar "god" → Biblias (15),
+       Inicio→Continuar persistente. Stack: `adapters.web.ts` (OPFS +
+       @sqlite.org/sqlite-wasm con FTS5 via deserialize; sql.js y wa-sqlite se
+       descartaron: vienen SIN FTS5) + `metro.config.js` mapea
+       `sqlite3-worker1.mjs`. Consola limpia, 0 errores.
+       CORS RESUELTO 2026-09-13 en aletheia-catalog v1.3.0: canal git+raw
+       (`releaseBase` pineado a tag con `ACAO:*`, `dist/*.amod` commiteados).
+       La app pineo v1.3.0 (`db8f59a`) y luego sumo puntero flotante
+       `catalog/latest.json` con fallback al pin (`68e748b`): ve siempre la
+       ultima version sin romperse. Sin cambios de engine: downloadUrl +
+       sha256 intactos.)
 - [ ] Auditoría: tamaño de app, arranque frío, accesibilidad, offline (Android+Web)
       (Evidencia 2026-09-11: web entry 2.16MB + sqlite3.wasm 869KB (lazy) + css 12KB;
       a11y estática 100% Pressable con role+label y targets ≥44px (se corrigió
@@ -259,7 +274,7 @@ verificación verde antes de continuar.
 - [ ] Inicio: tarjetas de planes activos + "leer juntos" como plantilla importable (sin backend)
 - [ ] Verificación: plan de 30 días creado, seguido 3 días, catch-up probado
 
-## F10 — Guías y workflows (requiere catálogo v1.1: TSK, Nave, Easton)
+## F10 — Guías y workflows (desbloqueado: TSK, Nave, Easton en catálogo ≥v1.2)
 
 - [ ] Guía de pasajes: comentarios + referencias cruzadas + diccionarios del pasaje
 - [ ] Workflows: plantillas personalizables (documento) + progreso por pasos + export
@@ -275,7 +290,7 @@ verificación verde antes de continuar.
 - [ ] Timeline básico por entidad (eventos de Nave)
 - [ ] Verificación: ficha de "David" con ≥3 fuentes agregadas
 
-## F12 — Idiomas originales (catálogo v1.1: WLC, SBLGNT, WHNU, Strong, Abbott-Smith, Robinson)
+## F12 — Idiomas originales (parcial: Strong griego/hebreo + Abbott-Smith en catálogo ≥v1.2; WLC/SBLGNT/WHNU/Robinson EXCLUIDOS por licencia, pendiente decisión usuario)
 
 - [ ] Interlineal por lema (verso de traducción ↔ verso original con strongs)
 - [ ] Word study: lema → Strong → entrada de léxico → ejemplos de uso en el texto
@@ -299,10 +314,11 @@ verificación verde antes de continuar.
 - [ ] Roadmap futuro documentado: atlas/mapas (AMF v2 media), sentidos (Louw-Nida PD),
       sync self-hosted, multi-idioma de UI
 
-## Coordinación con aletheia-catalog (lote v1.1 — habilita F10-F12)
+## Coordinación con aletheia-catalog (lote v1.1 — ENTREGADO en catálogo v1.2/v1.3)
 
-- [ ] TSK (comentario de xrefs, zCom — resolver versificación extendida)
-- [ ] Nave (topical/entities backbone), Easton, ISBE, Hitchcock (rawld4)
-- [ ] StrongsGreek, StrongsHebrew, Abbott-Smith (lexicon), Robinson (morphology)
-- [ ] WLC, SBLGNT, WHNU (biblias originales, zText4 — verificar versificación y strongs)
+- [x] TSK (comentario de xrefs, zCom 10B — 31089 entradas, en catálogo)
+- [x] Nave (topical/entities backbone), Easton, ISBE, Hitchcock (en catálogo)
+- [x] StrongsGreek, StrongsHebrew, Abbott-Smith (en catálogo; Robinson EXCLUIDO por licencia CC BY-SA)
+- [ ] WLC, SBLGNT, WHNU — EXCLUIDOS por licencia (SBLGNT non-commercial, WHNU CC BY-NC-SA, WLC requiere mapa Leningrad). Pendiente decisión usuario, no técnico
 - [ ] Módulo armonía de pasajes paralelos (fuente PD a definir)
+- [x] Canal + versionado (2026-09-13): git+raw pineado por tag con CORS `*`, `catalog/latest.json` flotante (release.yml lo mueve), gate anti-regresión. La app resuelve latest con fallback al pin

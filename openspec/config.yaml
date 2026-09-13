@@ -2,7 +2,7 @@ schema: spec-driven
 
 context: |
   aletheia-platform: plataforma de estudio bíblico gratuita y abierta (tipo Logos) en Expo.
-  Stack: Expo SDK 56 (React Native 0.85, React 19, New Architecture), Expo Router,
+  Stack: Expo SDK 57 (React Native 0.86, React 19, New Architecture), Expo Router,
   Bun workspaces (packages/core, packages/module-engine, apps/mobile),
   NativeWind/Uniwind (Tailwind v4), reanimated, expo-sqlite (enableFTS),
   EAS Build/Submit/Update.

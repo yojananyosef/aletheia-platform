@@ -16,7 +16,7 @@ existente se modifica ni se reutiliza como código: solo como conocimiento.
 
 - **Monorepo Bun** con `packages/core` (canon, settings, orquestador TTS),
   `packages/module-engine` (consumidor de .amod: catálogo → descarga → sha256 →
-  SQLite/FTS5 en sandbox) y `apps/mobile` (Expo SDK 56 universal).
+  SQLite/FTS5 en sandbox) y `apps/mobile` (Expo SDK 57 universal).
 - **Module-first**: las Biblias se leen desde módulos .amod del catálogo (no hay capa
   JSON propia). ASV, KJV, SME y Smith disponibles en v1 del catálogo.
 - **UX Logos-structured + confort heredado**: bottom tabs Inicio/Biblioteca/Leer/Estudio/
