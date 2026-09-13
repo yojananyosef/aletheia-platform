@@ -2,10 +2,50 @@ import { CatalogError } from './errors'
 import type { FileSystemPort, HttpPort } from './ports'
 import type { Catalog, CatalogModule, ModuleType } from './types'
 
-// Pindeado a tag inmutable: raw envia ACAO:* (CORS web OK) y una app vieja
-// nunca se rompe por un push nuevo. Subir de version = cambiar este pin.
+// Pin a tag inmutable: raw envia ACAO:* (CORS web OK) y una app vieja
+// nunca se rompe por un push nuevo. Es el fallback si el puntero latest falla.
 export const DEFAULT_CATALOG_URL =
   'https://raw.githubusercontent.com/yojananyosef/aletheia-catalog/v1.3.0/catalog/catalog.json'
+
+/**
+ * Puntero flotante a la ultima version publicada (vive en main, lo mueve el
+ * workflow release del repo del catalogo tras cada tag). La app lo lee para
+ * ver siempre lo ultimo; la integridad la garantiza el sha256 por modulo,
+ * asi que resolver a una version nueva es seguro. Si falla, se usa el pin.
+ */
+export const LATEST_POINTER_URL =
+  'https://raw.githubusercontent.com/yojananyosef/aletheia-catalog/main/catalog/latest.json'
+
+const POINTER_TIMEOUT_MS = 8000
+
+interface LatestPointer {
+  catalogUrl: string
+}
+
+function validatePointer(raw: unknown): LatestPointer {
+  if (typeof raw !== 'object' || raw === null) throw new Error('puntero latest invalido')
+  const r = raw as Record<string, unknown>
+  if (r['format'] !== 'amf-latest-pointer') throw new Error('puntero latest con formato desconocido')
+  const url = r['catalogUrl']
+  if (
+    typeof url !== 'string' ||
+    !url.startsWith('https://raw.githubusercontent.com/yojananyosef/aletheia-catalog/v') ||
+    !url.endsWith('/catalog/catalog.json')
+  ) {
+    throw new Error('puntero latest con catalogUrl inesperada')
+  }
+  return { catalogUrl: url }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('timeout leyendo puntero latest')), ms)
+  })
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer)
+  })
+}
 
 const MODULE_TYPES: readonly ModuleType[] = [
   'bible',
@@ -88,6 +128,7 @@ export class CatalogService {
     private readonly fs: FileSystemPort,
     private readonly cachePath: string,
     private readonly url: string = DEFAULT_CATALOG_URL,
+    private readonly pointerUrl: string | null = LATEST_POINTER_URL,
   ) {}
 
   async get(): Promise<Catalog> {
@@ -102,8 +143,32 @@ export class CatalogService {
     return this.refresh()
   }
 
+  /**
+   * Resuelve la URL del catalogo: puntero latest primero, pin como fallback.
+   * Cualquier fallo del puntero (red, timeout, formato) cae al pin sin ruido.
+   */
+  async resolveCatalogUrl(): Promise<string> {
+    if (this.pointerUrl === null) return this.url
+    try {
+      const raw = await withTimeout(this.http.getJson<unknown>(this.pointerUrl), POINTER_TIMEOUT_MS)
+      return validatePointer(raw).catalogUrl
+    } catch {
+      return this.url
+    }
+  }
+
   async refresh(): Promise<Catalog> {
-    const raw = await this.http.getJson<unknown>(this.url)
+    const url = await this.resolveCatalogUrl()
+    try {
+      return await this.download(url)
+    } catch (error) {
+      if (url !== this.url) return this.download(this.url)
+      throw error
+    }
+  }
+
+  private async download(url: string): Promise<Catalog> {
+    const raw = await this.http.getJson<unknown>(url)
     const catalog = validateCatalog(raw)
     await this.fs.mkdir(dirname(this.cachePath))
     await this.fs.writeFile(this.cachePath, new TextEncoder().encode(JSON.stringify(catalog)))
