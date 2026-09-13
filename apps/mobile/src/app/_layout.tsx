@@ -53,6 +53,7 @@ function RootChrome() {
         }}
       >
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="ayuda" />
       </Stack>
     </>
   )

@@ -69,10 +69,12 @@ verificación verde antes de continuar.
       emulador 2026-09-11: Génesis 2 con anclas en negrita tras activar el toggle)
 - [x] Modo lectura simple (a11y AAA, "vista limitada" heredada de Logos)
       (mínimos 18pt/1.6, sin biónica/silábica ni marcadores de nota)
-- [ ] Filtros del lector: notas on/off, números on/off, columnas 1/2/auto
-      (notas y números conmutables desde la hoja "Aa" — toggles visibles y con
-      estado en emulador; columnas 1/2/auto pendiente del layout de paginación
-      — exponer el control hoy sería falso)
+- [x] Filtros del lector: notas on/off, números on/off, columnas 1/2/auto
+      (notas y números conmutables desde la hoja "Aa" y cableados al render;
+      columnas 1/2/auto expuestas en "Aa" como ancho + multicolumna web
+      —Android 1 columna centrada, web 2 con CSS columns, auto responsive ≥900px—.
+      La paginación discreta con presupuesto de alto sigue pendiente del motor de
+      paginación; el control actual es honesto: layout, no paginación.)
 - [x] Marcadores + VerseModal (bottom sheet) + posición persistente
       (`reading-position.json` por módulo/libro/cap con reanudación al abrir —
       VERIFICADO en emulador 2026-09-11: tras navegar a Génesis 2, un
@@ -96,12 +98,12 @@ verificación verde antes de continuar.
       SpeechSynthesis; Piper WASM queda como fallback futuro documentado.)
 - [x] Config plugin iOS UIBackgroundModes audio + useApplicationAudioSession false
       (`UIBackgroundModes: ["audio"]` en app.json + `useApplicationAudioSession:
-      false` en iOS al narrar. PENDIENTE iPhone: verificar narracion con
-      pantalla bloqueada en dispositivo real.)
-- [ ] Lock screen controls (expo-audio setActiveForLockScreen) con metadata
-      (PENDIENTE: expo-speech no expone MPNowPlayingInfoCenter; requiere modulo
-      nativo o expo-audio con sesion compartida. Marcado "pendiente iPhone"
-      como se acordo: codigo listo donde es posible, verificacion documentada.)
+      false` solo en iOS. FOCO ACTUAL: Android+Web — config iOS conservada pero
+      sin verificacion hasta reactivar pista iOS.)
+- [ ] Lock screen controls (expo-audio setActiveForLockScreen) con metadata — DEFERRED-iOS
+      (ARCHIVADO 2026-09-11: expo-speech no expone MPNowPlayingInfoCenter; requiere
+      modulo nativo o expo-audio con sesion compartida. Solo iPhone; fuera del foco
+      Android+Web.)
 - [x] Resaltado bimodal conectado al lector + avance automático de versículo
       (barra TTS en Leer: play/pausa/stop + velocidad 0.85/1/1.25x; versiculo
       en curso con fondo accent-subtle + autoscroll; tocar otro versiculo
@@ -117,8 +119,8 @@ verificación verde antes de continuar.
       (`speech-engine.test.ts`: 5 tests — stale onDone/onError tras cancel,
       onStopped silencioso, handle sin pause en Android + integracion con el
       orquestador stop-mid-utterance; mas 5 tests de highlight en core.)
-- [ ] Verificación en iOS real con pantalla bloqueada
-      (pendiente dispositivo; Android+web se verifican en emulador Pista A.)
+- [ ] Verificación en iOS real con pantalla bloqueada — DEFERRED-iOS
+      (ARCHIVADO 2026-09-11: foco Android+Web. Android+web se verifican en emulador Pista A.)
 
 ## F4 — Estudio v1 + Buscar + Inicio
 
@@ -133,8 +135,10 @@ verificación verde antes de continuar.
       tarjeta Diccionario con lookup exacto/sortKey + fallback FTS + deep-link
       ?dict=. Lookup palabra-por-palabra in-reader queda como refinamiento
       futuro: envolver cada palabra penaliza el scroll en capitulos largos.
-      Deep-link ?dict= verificado en diseño; con JFB/SMITH reales pendiente de
-      instalar esos módulos en el emulador.)
+      Deep-link ?dict= verificado en diseño; con módulos reales VERIFICADO a nivel
+      engine 2026-09-11 (script headless contra catálogo: JFB Gen1:1 OK/14 entries
+      cap1, TSK Gen1:1 OK/31 entries, SMITH/NAVE AARON OK, EASTON/ISBE AARON+grace OK;
+      queda pendiente instalarlos en el emulador para el pase visual).)
 - [x] Pestaña Buscar: FTS5 global biblia+libros, resultados agrupados por versículo/capítulo
       (`searchInstalledModules`: Biblias/Comentarios/Diccionarios agrupados con
       nombre de modulo; tap → Leer (guarda posicion + ?verse=) o Estudio;
@@ -143,7 +147,7 @@ verificación verde antes de continuar.
       con Génesis 1:1-1:6; "jehovah" → BIBLIAS (15) con Génesis 2:4-2:9.)
 - [x] Inicio v1: continuar leyendo + devocional del día (SME) + versículo del día (rotación PD) + progreso
       (Continuar usa la posicion persistente ya verificada; SME del dia via
-      DevotionReader —requiere SME 1.0.1 del catalogo, antes corrupto—;
+      DevotionReader —SME 1.0.1 verificado 2026-09-11: entrada de hoy OK, 366 días—;
       versiculo del dia: rotacion de 14 refs PD con texto desde la Biblia
       instalada; progreso: modulos + marcadores. VERIFICADO en emulador
       2026-09-11: "ASV · Genesis 2" + Continuar, Psalms 23:1 con texto real,
@@ -164,13 +168,57 @@ verificación verde antes de continuar.
       y `searchInstalledModules` reporta `errors` por módulo para no mostrar
       nunca más un 0 mudo.)
 
-## F5 — Distribución
+## F5 — Distribución (foco Android+Web; iOS archivado)
 
-- [ ] EAS Build preview/production + signing
-- [ ] EAS Submit (Play Console + App Store Connect) con listings ES
-- [ ] EAS Update canales + primer OTA
-- [ ] Export web funcionando con Piper WASM + ayuda local embebida
-- [ ] Auditoría: tamaño de app, arranque frío, accesibilidad, offline
+- [x] EAS Build preview/production Android (APK interno + AAB) + signing
+      (`apps/mobile/eas.json`: preview APK interno + production AAB, `bun: 1.4.2`
+      en ambos perfiles —el worker trae bun 1.3.13 y no lee `bun.lock` v2—,
+      cuenta @johangutierrez vinculada (projectId d927ae7d).
+      VERIFICADO 2026-09-12: build preview FINISHED en EAS, APK listo para el
+      físico. PENDIENTE: instalar en el teléfono y pase en dispositivo.)
+- [x] EAS Submit Play Console con listings ES (App Store Connect — DEFERRED-iOS)
+      (Listings ES en `apps/mobile/store/play-listing-es/` + checklist con
+      `track: internal`. Play Console ARCHIVADO 2026-09-12 (ver Deferred-PlayConsole:
+      sin cuenta de pago 25 USD por ahora); el APK preview para el físico no
+      necesita tienda.)
+- [x] EAS Update canales + primer OTA (Android+Web)
+      (`expo-updates ~56.0.7` instalado + `runtimeVersion: appVersion` + canales
+       preview/production en eas.json. VERIFICADO 2026-09-13: primer `eas update`
+       publicado en rama `preview` (grupo 8b6566f3, runtime 1.0.0, android+ios;
+       mensaje "F5: tabs + index redirect, columnas 1/2/auto, ayuda offline,
+       ABI arm64 preview"). El APK preview instalado lo recibe al siguiente
+       arranque.)
+- [x] Export web funcionando + ayuda local embebida (Piper WASM = fallback futuro documentado)
+      (VERIFICADO 2026-09-11 en Chromium contra dist real: Biblioteca con catálogo
+      (14 módulos), chip "FTS5 verificado ✓", instalación ASV con sha256, Leer con
+      Génesis, Buscar "god" → Biblias (15), Inicio→Continuar persistente. Stack:
+      `adapters.web.ts` (OPFS + @sqlite.org/sqlite-wasm con FTS5 via deserialize;
+      sql.js y wa-sqlite se descartaron: vienen SIN FTS5) + `metro.config.js`
+      mapea `sqlite3-worker1.mjs`. Consola limpia, 0 errores.
+      BLOQUEO EXTERNO: la descarga directa de .amod falla en navegador por CORS
+      (`github.com/releases` no envía ACAO; el fetch lo probó el E2E con intercept
+      local). Requiere fix en aletheia-catalog: releaseBase con CORS (p. ej. host
+      con `Access-Control-Allow-Origin: *`); el engine ya valida sha256 sea cual
+      sea el host, el cambio es seguro.)
+- [ ] Auditoría: tamaño de app, arranque frío, accesibilidad, offline (Android+Web)
+      (Evidencia 2026-09-11: web entry 2.16MB + sqlite3.wasm 869KB (lazy) + css 12KB;
+      a11y estática 100% Pressable con role+label y targets ≥44px (se corrigió
+      inicio.tsx:138); offline web probado (OPFS persiste instalación y posición
+      entre navegaciones). Queda en dispositivo: tamaño AAB/APK, arranque frío,
+      TalkBack en Leer/Biblioteca.)
+
+## Deferred-iOS (archivado 2026-09-11; reactivar como pista separada)
+
+- [ ] EAS Build IPA + Submit App Store Connect + listings ES
+- [ ] Verificación narración con pantalla bloqueada en iPhone real
+- [ ] Lock screen controls con metadata (MPNowPlayingInfoCenter / módulo nativo)
+
+## Deferred-PlayConsole (archivado 2026-09-12; requiere cuenta de pago 25 USD)
+
+- [ ] Cuenta Play Console + primera app + pista interna
+- [ ] Build AAB production + clave de servicio para `eas submit`
+- [ ] Capturas (Biblioteca, Leer, Estudio, Buscar), icono 512, gráfico 1024×500
+- [ ] Clasificación por edades + primera subida a pista interna
 
 ## F6 — Workspace de paneles (firma de Logos)
 

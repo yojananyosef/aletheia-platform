@@ -1,0 +1,13 @@
+Aletheia es una plataforma de estudio bíblico gratuita y abierta.
+
+- Biblioteca: módulos del catálogo oficial con licencia siempre visible.
+- Leer: temas pergamino/sepia/noche, fuentes accesibles (incluye OpenDyslexic),
+  lectura biónica y silábica, modo simple AAA y marcadores con posición persistente.
+- Escuchar: narración con resaltado del versículo en curso y karaoke palabra por palabra.
+- Estudiar: comentario sincronizado por pasaje, diccionarios y búsqueda de texto
+  completo insensible a acentos, todo offline tras la primera descarga.
+- Sin cuentas, sin anuncios, sin nube: tus datos quedan en tu dispositivo.
+
+Contenido de dominio público (p. ej. American Standard Version 1901, King James,
+Spurgeon, Smith, Easton, Nave, Strong, Treasury of Scripture Knowledge), con
+atribución visible en cada ficha.

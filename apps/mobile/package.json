@@ -7,7 +7,9 @@
     "@aletheia/module-engine": "workspace:*",
     "@expo/ui": "~56.0.26",
     "@expo/vector-icons": "^15.0.2",
+    "@sqlite.org/sqlite-wasm": "3.53.4-build1",
     "expo": "~56.0.21",
+    "expo-asset": "~56.0.5",
     "expo-constants": "~56.0.25",
     "expo-crypto": "~56.0.5",
     "expo-device": "~56.0.4",
@@ -23,6 +25,7 @@
     "expo-status-bar": "~56.0.4",
     "expo-symbols": "~56.0.7",
     "expo-system-ui": "~56.0.5",
+    "expo-updates": "~56.0.7",
     "expo-web-browser": "~56.0.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -42,8 +45,8 @@
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint"

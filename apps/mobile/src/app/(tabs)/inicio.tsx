@@ -137,6 +137,7 @@ export default function InicioScreen() {
             <Link href="/biblioteca" asChild>
               <Pressable
                 accessibilityRole="button"
+                accessibilityLabel="Ir a la Biblioteca"
                 className="min-h-[44px] items-center justify-center rounded-xl bg-accent px-5 active:bg-hover"
               >
                 <Text className="text-base font-semibold text-accent-fg">Ir a la Biblioteca</Text>
@@ -179,6 +180,15 @@ export default function InicioScreen() {
           <ActivityIndicator color="#7a6a4f" />
         )}
       </View>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Abrir ayuda local"
+        onPress={() => router.push('/ayuda')}
+        className="min-h-[44px] items-center justify-center rounded-xl border border-reader-border px-5 active:bg-hover"
+      >
+        <Text className="text-base font-semibold text-reader-text">Ayuda</Text>
+      </Pressable>
 
       <View className="gap-2 rounded-2xl border border-reader-border p-5">
         <Text className="text-xs font-bold uppercase text-reader-muted">Tu progreso</Text>

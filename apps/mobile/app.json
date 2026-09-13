@@ -12,7 +12,10 @@
       "bundleIdentifier": "org.aletheia.platform",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": ["audio"]
+        "UIBackgroundModes": [
+          "audio",
+          "audio"
+        ]
       }
     },
     "android": {
@@ -29,7 +32,16 @@
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "checkAutomatically": "ON_ERROR_RECOVERY",
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/d927ae7d-f9d8-43d7-a777-b5923fbd205d"
+    },
     "plugins": [
+      "./plugins/android-abi-filter",
       "expo-router",
       [
         "expo-sqlite",
@@ -49,6 +61,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d927ae7d-f9d8-43d7-a777-b5923fbd205d"
+      }
+    },
+    "owner": "johangutierrez"
   }
 }

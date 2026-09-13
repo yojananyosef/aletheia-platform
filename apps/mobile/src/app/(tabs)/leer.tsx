@@ -3,10 +3,12 @@ import {
   ActivityIndicator,
   FlatList,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 
@@ -17,6 +19,7 @@ import {
   splitWords,
   toBionicSegments,
   toSyllabicText,
+  type ColumnMode,
   type FontFamilyId,
   type ThemeName,
   type TTSState,
@@ -88,6 +91,12 @@ const FONT_OPTIONS: Array<{ id: FontFamilyId; label: string }> = [
   { id: 'opendyslexic', label: 'OpenDyslexic' },
 ]
 
+const COLUMN_OPTIONS: Array<{ id: ColumnMode; label: string }> = [
+  { id: '1', label: '1' },
+  { id: '2', label: '2' },
+  { id: 'auto', label: 'Auto' },
+]
+
 export default function LeerScreen() {
   const engine = useEngine()
   const { settings, update } = useSettings()
@@ -106,6 +115,8 @@ export default function LeerScreen() {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Antes de cualquier return temprano (regla de hooks): viewport para columnas.
+  const { width: windowWidth } = useWindowDimensions()
   // TTS bimodal (F3): versiculo en curso + palabra del karaoke + estado.
   const [ttsState, setTtsState] = useState<TTSState>('idle')
   const [ttsVerseIndex, setTtsVerseIndex] = useState<number | null>(null)
@@ -430,6 +441,18 @@ export default function LeerScreen() {
     lineHeight: fontSize * lineHeight,
     letterSpacing: settings.letterSpacing,
   }
+  // Columnas 1/2/auto (F2, foco Android+Web): en ScrollView continuo se aplican
+  // como ancho maximo + multicolumna web. Nativo: 1 columna (2/auto => ancho
+  // amplio centrado). Web: 2/auto-ancho usan CSS columns. La paginacion discreta
+  // con presupuesto de alto sigue pendiente del motor de paginacion.
+  const wideWeb = Platform.OS === 'web' && windowWidth >= 900
+  const twoColWeb = settings.columns === '2' || (settings.columns === 'auto' && wideWeb)
+  const readerMaxWidth =
+    settings.columns === '1' ? 680 : settings.columns === '2' ? 1100 : wideWeb ? 1100 : 800
+  const readerBodyStyle =
+    Platform.OS === 'web' && twoColWeb
+      ? { columnCount: 2, columnGap: 32 } as const
+      : undefined
   const verseNumbersColor = THEME_TOKENS[settings.theme].readerMuted
   const chapterNumbers = book !== null ? Array.from({ length: book.chapterCount }, (_, k) => k + 1) : []
 
@@ -551,8 +574,13 @@ export default function LeerScreen() {
           <Text className="text-sm text-reader-muted">Capítulo vacío.</Text>
         </View>
       ) : (
-        <ScrollView ref={scrollRef} contentContainerClassName="px-5 pb-10 pt-3">
-          <Text style={baseTextStyle} className="text-reader-text">
+        <ScrollView
+          ref={scrollRef}
+          contentContainerClassName="px-5 pb-10 pt-3"
+          contentContainerStyle={{ alignItems: 'center' }}
+        >
+          <View style={{ width: '100%', maxWidth: readerMaxWidth }}>
+          <Text style={[baseTextStyle, readerBodyStyle]} className="text-reader-text">
             {items.map((item, i) =>
               item.kind === 'heading' ? (
                 <Text key={`h-${String(i)}`}>
@@ -619,6 +647,7 @@ export default function LeerScreen() {
               ),
             )}
           </Text>
+          </View>
         </ScrollView>
       )}
 
@@ -991,6 +1020,24 @@ function ReadingSettingsSheet({ visible, onClose }: { visible: boolean; onClose(
                 value={settings.footnotes}
                 onToggle={() => update({ footnotes: !settings.footnotes })}
               />
+              <Text className="text-sm text-reader-muted">
+                Columnas (en móvil 1 columna; en web 2 divide el texto)
+              </Text>
+              <View className="flex-row gap-2">
+                {COLUMN_OPTIONS.map((c) => (
+                  <Pressable
+                    key={c.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Columnas ${c.label}`}
+                    onPress={() => update({ columns: c.id })}
+                    className={`min-h-[44px] flex-1 items-center justify-center rounded-xl px-2 ${settings.columns === c.id ? 'bg-accent' : 'bg-hover'}`}
+                  >
+                    <Text className={`text-sm font-semibold ${settings.columns === c.id ? 'text-accent-fg' : 'text-reader-text'}`}>
+                      {c.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
             </SettingsGroup>
             <SettingsGroup label="Ayudas de lectura">
               <ToggleRow

@@ -6,17 +6,16 @@ import { pickVoiceId } from '@aletheia/core'
 import { createSpeechEngine, type SpeechBackend } from './speech-engine'
 
 /**
- * Adaptador de produccion: `expo-speech` (nativo iOS/Android + web via
- * SpeechSynthesis) como backend del SpeechEngine testeable (F3).
+ * Adaptador de produccion: `expo-speech` (Android + web via SpeechSynthesis;
+ * iOS conservado pero archivado) como backend del SpeechEngine testeable (F3).
  *
- * - iOS: `useApplicationAudioSession: false` (el sistema gestiona ducking e
- *   interrupciones) + UIBackgroundModes audio en app.json para continuar con
- *   la pantalla bloqueada. Lock-screen metadata (MPNowPlayingInfoCenter)
- *   requiere un modulo nativo: pendiente de iPhone, documentado en tasks.
- * - Android: sin pause()/resume() (la API no los expone) — el orquestador
- *   aplica su fallback (cancelar + re-narrar al reanudar).
- * - Web: expo-speech delega en window.speechSynthesis (boundary DOM con
- *   charIndex/charLength); Piper WASM queda como fallback futuro documentado.
+ * - Foco Android+Web (2026-09-11): Android sin pause()/resume() — el orquestador
+ *   aplica su fallback (cancelar + re-narrar al reanudar). Web delega en
+ *   window.speechSynthesis (boundary DOM con charIndex/charLength); Piper WASM
+ *   queda como fallback futuro documentado.
+ * - iOS archivado: `useApplicationAudioSession: false` + UIBackgroundModes audio
+ *   en app.json se conservan, pero lock-screen metadata (MPNowPlayingInfoCenter)
+ *   y verificacion en iPhone real quedan en Deferred-iOS (ver tasks.md).
  */
 const expoBackend: SpeechBackend = {
   speak(text, options) {

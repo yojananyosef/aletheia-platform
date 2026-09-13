@@ -1,14 +1,15 @@
 ## ADDED Requirements
 
-### Requirement: Distribución EAS universal
+### Requirement: Distribución EAS Android+Web (iOS diferido)
 
-El proyecto SHALL compilar y distribuir mediante EAS: perfiles preview (APK/IPA internos)
-y production (AAB/IPA para Play Console y App Store Connect), con export web funcional
-y updates OTA vía EAS Update.
+El proyecto SHALL compilar y distribuir mediante EAS con foco Android+Web: perfiles
+preview (APK interno) y production (AAB para Play Console), con export web funcional
+y updates OTA vía EAS Update. iOS (IPA + App Store Connect + pantalla bloqueada +
+lock-screen) queda archivado como pista separada (ver `tasks.md` Deferred-iOS).
 
 #### Scenario: Build de tiendas
 - **WHEN** se ejecuta EAS Build con perfil production y EAS Submit
-- **THEN** el AAB llega a Play Console y el IPA a App Store Connect
+- **THEN** el AAB llega a Play Console; el export web se publica como estático
 
 #### Scenario: OTA sin tienda
 - **WHEN** se publica un fix JS-only

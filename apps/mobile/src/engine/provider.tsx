@@ -1,4 +1,3 @@
-import { Paths } from 'expo-file-system'
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
 
 import {
@@ -16,7 +15,7 @@ import {
   type InstalledModule,
 } from '@aletheia/module-engine'
 
-import { createEnginePorts } from './adapters'
+import { createEnginePorts, getSandboxDir } from './adapters'
 
 interface EngineContextValue {
   ports: EnginePorts
@@ -38,7 +37,9 @@ const EngineContext = createContext<EngineContextValue | null>(null)
 export function EngineProvider({ children }: { children: ReactNode }) {
   const value = useMemo<EngineContextValue>(() => {
     const ports = createEnginePorts()
-    const sandboxDir = Paths.document.uri
+    // Nativo: Paths.document.uri; web: raiz logica OPFS 'aletheia' (Metro
+    // resuelve './adapters' por plataforma; expo-file-system no existe en web).
+    const sandboxDir = getSandboxDir()
     const registry = new ModuleRegistry(ports.fs, sandboxDir)
     const catalog = new CatalogService(ports.http, ports.fs, `${sandboxDir}/catalog.json`)
     return {

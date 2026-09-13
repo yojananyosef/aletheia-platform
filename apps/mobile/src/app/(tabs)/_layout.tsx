@@ -22,6 +22,7 @@ export default function TabsLayout() {
   const tokens = themeTokens(settings.theme)
   return (
     <Tabs
+      initialRouteName="inicio"
       screenOptions={{
         headerStyle: { backgroundColor: tokens.readerBg },
         headerTintColor: tokens.readerText,
