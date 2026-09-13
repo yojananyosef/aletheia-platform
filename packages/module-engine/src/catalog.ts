@@ -2,8 +2,10 @@ import { CatalogError } from './errors'
 import type { FileSystemPort, HttpPort } from './ports'
 import type { Catalog, CatalogModule, ModuleType } from './types'
 
+// Pindeado a tag inmutable: raw envia ACAO:* (CORS web OK) y una app vieja
+// nunca se rompe por un push nuevo. Subir de version = cambiar este pin.
 export const DEFAULT_CATALOG_URL =
-  'https://raw.githubusercontent.com/yojananyosef/aletheia-catalog/main/catalog/catalog.json'
+  'https://raw.githubusercontent.com/yojananyosef/aletheia-catalog/v1.3.0/catalog/catalog.json'
 
 const MODULE_TYPES: readonly ModuleType[] = [
   'bible',

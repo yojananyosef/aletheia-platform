@@ -17,7 +17,7 @@ import { bunSqlite, fetchHttp, nodeCrypto, nodeFs } from './adapters/node'
  * aletheia-catalog — catalog.json de GitHub + ASV.amod del release.
  */
 const CATALOG_URL =
-  'https://raw.githubusercontent.com/yojananyosef/aletheia-catalog/main/catalog/catalog.json'
+  'https://raw.githubusercontent.com/yojananyosef/aletheia-catalog/v1.3.0/catalog/catalog.json'
 
 let sandboxDir: string
 let ports: EnginePorts
@@ -38,9 +38,9 @@ afterAll(async () => {
 })
 
 describe('E2E engine: catalogo real → instalar ASV → leer Genesis 1:1', () => {
-  test('el catalogo real trae los 14 modulos v1.1 con licencia visible', () => {
+  test('el catalogo real trae los 17 modulos v1.3 con licencia visible', () => {
     expect(catalog.format).toBe('amf-catalog')
-    expect(catalog.modules.map((m) => m.id).sort()).toEqual(['ABBOTTSMITH', 'ASV', 'EASTON', 'HITCHCOCK', 'ISBE', 'JFB', 'KJV', 'NAVE', 'SME', 'SMITH', 'STRONGSGREEK', 'STRONGSHEBREW', 'TSK', 'WEB'])
+    expect(catalog.modules.map((m) => m.id).sort()).toEqual(['ABBOTTSMITH', 'APF', 'ASV', 'CREEDS', 'EASTON', 'HITCHCOCK', 'ISBE', 'JFB', 'KJV', 'NAVE', 'SME', 'SMITH', 'STRONGSGREEK', 'STRONGSHEBREW', 'TSK', 'VINCENT', 'WEB'])
     for (const m of catalog.modules) {
       expect(m.license.length).toBeGreaterThan(0)
       expect(m.attribution.length).toBeGreaterThan(0)
